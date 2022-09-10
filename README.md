@@ -30,14 +30,11 @@ proc main() {.async.} =
   discard await site.getGroups()
 
   echo "Введи номер группы"
-  let input = readLine(stdin)
+  let
+    input = readLine(stdin)
+    groups = site.groups.filter do (x: Group) -> bool: x.display.contains(input)
 
-  let groups = site.groups.filter do (x: Group) -> bool: x.display.contains(input)
-
-  if groups.len == 0:
-    echo "Группы не нашлось =("
-  else:
-    echo "Найдены группы: " & $groups
+  echo if groups.len == 0: "Группы не нашлось =(" else: "Найдены группы: " & $groups
 
 waitFor main()
 ```
