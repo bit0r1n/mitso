@@ -15,9 +15,9 @@ type
     weeks*: seq[SelectOption]
   Lesson* = ref object
     date*: DateTime
-    time*: LessonTime
     name*: string
     teachers*: seq[string]
+    lessonTime*: LessonTime
     lType*: LessonType
     classrooms*: seq[string]
   ScheldueDay* = ref object

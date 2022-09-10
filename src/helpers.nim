@@ -1,5 +1,10 @@
 import strutils, strformat, times
 import typedefs, constants
+from math import `^`
+
+proc minskUtcTzInfo(time: Time): ZonedTime =
+  ZonedTime(utcOffset: (60 ^ 2) * 3, isDst: false, time: time)
+let utcMinsk* = newTimezone("Europe/Minsk", minskUtcTzInfo, minskUtcTzInfo)
 
 proc parseTeachers*(rawString: string): seq[string] =
   let strings = rawString.split("\n")
@@ -218,7 +223,7 @@ proc `$`*(lesson: LessonType): string =
     return "Экзамен"
 
 proc `$`*(lesson: Lesson): string =
-  var items = @[$lesson.time]
+  var items = @[$lesson.lessonTime]
   if lesson.classrooms.len != 0: items.add("Ауд. " & lesson.classrooms.join(", "))
   items.add(lesson.name)
   items.add($lesson.lType)

@@ -181,7 +181,9 @@ proc getScheldue*(group: Group, week: SelectOption): Future[seq[ScheldueDay]] {.
             dayTime = dateTime(
               now().year + (if scheldueDayMonth == mJan and now().month == mDec: 1 else: 0),
               scheldueDayMonth,
-              parseInt(dateString.split(" ")[0])
+              parseInt(dateString.split(" ")[0]),
+              3, 0, 0,
+              zone = utcMinsk
             )
 
           var day = ScheldueDay(
@@ -204,20 +206,21 @@ proc getScheldue*(group: Group, week: SelectOption): Future[seq[ScheldueDay]] {.
               lessonStrings = lessonElements[1].child("div").innerText.split("\n")
               classroomString = lessonElements[3].innerText
 
-            var
               # если элементов 5 - занятие проходит в двух аудитория с двумя преподавателями (лаба короче), в начале названий занятия есть пункт "N. "
               lessonName = if lessonStrings.len == 5: lessonStrings[0][3..^1] else: lessonStrings[0]
               teachers = parseTeachers($lessonElements[1].child("div"))
               classrooms = parseClassrooms(classroomString)
+              lessonTime = parseTime(timeString)
 
-            let
-              startTime = parseTime(timeString)
+            var lessonDateTime = dayTime
+            lessonDateTime += initDuration(hours = ($%lessonTime).hours, minutes = ($%lessonTime).minutes)
 
             var lesson = Lesson(
-              time: parseTime(timeString),
-              name: lessonName,
-              lType: parseLessonType(lessonStrings[1])
-            )
+                date: lessonDateTime,
+                lessonTime: lessonTime,
+                name: lessonName,
+                lType: parseLessonType(lessonStrings[1])
+              )
 
             if teachers.len != 0:
               lesson.teachers = teachers
