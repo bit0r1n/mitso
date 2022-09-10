@@ -1,4 +1,4 @@
-import parser, typedefs, helpers
+import mitsopkg/[parser, typedefs, helpers]
 
 when not isMainModule:
   export parser, typedefs, helpers
