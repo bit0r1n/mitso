@@ -1,5 +1,5 @@
 import strutils
 
 proc debug*(args: varargs[string, `$`]): void =
-  if defined(mDebug):
+  if defined(debug):
     echo args.join(" ")

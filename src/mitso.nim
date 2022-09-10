@@ -1,4 +1,4 @@
-import sequtils, strutils, asyncdispatch
+import sequtils, strutils, asyncdispatch, times
 import parser, typedefs, helpers
 
 proc main(): Future[void] {.async.} =

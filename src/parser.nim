@@ -3,7 +3,7 @@ import std/[
   htmlparser, xmltree, strtabs,
   uri, options, strformat,
   algorithm, sequtils, strutils,
-  times
+  times, threadpool
 ]
 import utils, typedefs, helpers, constants
 
@@ -11,9 +11,9 @@ proc newSite*(): Site = Site()
 
 proc loadPage*(site: Site): Future[string] {.async.} =
   # Получение и сохранение контента сайта
-  var client = newAsyncHttpClient(sslContext=newContext(verifyMode=CVerifyNone))
+  var client = newHttpClient(sslContext=newContext(verifyMode=CVerifyNone))
   debug "[loadPage]", "Получение контента базовой страницы"
-  let content = await client.getContent(SCHELDUE_URL)
+  let content = client.getContent(SCHELDUE_URL)
   debug "[loadPage]", "Контент получен, сохранение"
   site.content = some content
   return content
@@ -33,75 +33,104 @@ proc getFaculties*(site: Site): seq[SelectOption] =
           result.add(facult)
           site.faculties.add(facult)
 
+proc threadParseCourse(site: Site, facult: SelectOption, form: SelectOption, course: SelectOption): seq[Group] =
+  var client = newHttpClient(sslContext=newContext(verifyMode=CVerifyNone))
+  debug "[threadParseCourse]", fmt"Получение групп ({$course}, {$facult}, {$form})"
+  let
+    groupsRawHtml = client.getContent(parseUri(SCHELDUE_DATA_URL) ? {
+      "type": "group_class",
+      "kaf": KAF_QUERY,
+      "fak": facult.id,
+      "form": form.id,
+      "kurse": course.id
+    })
+    groupsHtml = parseHtml(groupsRawHtml)
+
+  # Парс групп и сохранение
+  for groupElement in groupsHtml.findAll("option"):
+    let group = Group(
+      site: site,
+      id: groupElement.attr("value"),
+      display: groupElement.innerText,
+      course: parseCourse(course[0]),
+      form: parseForm(form[0]),
+      faculty: parseFaculty(facult.id)
+    )
+    debug "[threadParseCourse]", "Найдена группа", $group
+    result.add(group)
+
+proc threadParseForm(site: Site, facult: SelectOption, form: SelectOption): seq[Group] =
+  var client = newHttpClient(sslContext=newContext(verifyMode=CVerifyNone))
+  debug "[threadParseForm]", fmt"Получение курсов для факультета {$facult} ({$form})"
+  var
+    coursesRawHtml = client.getContent(parseUri(SCHELDUE_DATA_URL) ? {
+      "type": "kurse",
+      "kaf": KAF_QUERY,
+      "fak": facult.id,
+      "form": form.id
+    })
+    coursesHtml = parseHtml(coursesRawHtml)
+    courses = newSeq[SelectOption]()
+
+  # Парс курсов формы обучения
+  for courseElement in coursesHtml.findAll("option"):
+    let course = (courseElement.attr("value"), courseElement.innerText)
+    debug "[threadParseForm]", fmt"Найден курс: {$course} ({$facult}, {$form})"
+    courses.add(course)
+
+  # Проход по курсам
+  var groupsResponses = newSeq[FlowVar[seq[Group]]]()
+  for course in courses.items:
+    groupsResponses.add(spawn threadParseCourse(site, facult, form, course))
+
+  for response in groupsResponses:
+    let groups = ^response
+    for group in groups:
+      result.add(group)
+
+proc threadParseFaculty(site: Site, facult: SelectOption): seq[Group] =
+  var client = newHttpClient(sslContext=newContext(verifyMode=CVerifyNone))
+  debug "[threadParseFaculty]", "Получение форм обучения для факультета", $facult
+  var
+    formsRawHtml = client.getContent(parseUri(SCHELDUE_DATA_URL) ? {
+      "type": "form",
+      "kaf": KAF_QUERY,
+      "fak": facult.id
+    })
+    formsHtml = parseHtml(formsRawHtml)
+    forms = newSeq[SelectOption]()
+
+  # Парс форм обучения
+  for formElement in formsHtml.findAll("option"):
+    let form = (formElement.attr("value"), formElement.innerText)
+    debug "[threadParseFaculty]", fmt"Найдена форма обучения: {$form} ({$facult})"
+    forms.add(form)
+
+  # Проход по формам обучения
+  var formsResponses = newSeq[FlowVar[seq[Group]]]()
+  for form in forms.items:
+    formsResponses.add(spawn threadParseForm(site, facult, form))
+  for response in formsResponses:
+      let groups = ^response
+      for group in groups:
+        result.add(group)
+
 proc getGroups*(site: Site): Future[seq[Group]] {.async.} =
   # Получение, фильтрация и сохранение групп
-  var client = newAsyncHttpClient(sslContext=newContext(verifyMode=CVerifyNone))
 
   # Очистка списка групп
   site.groups.setLen(0)
 
+  var facultiesResponses = newSeq[FlowVar[seq[Group]]]()
+
   # Проход по факультетам
   for facult in site.faculties:
-    debug "[getGroups]", "Получение форм обучения для факультета", $facult
-    var
-      formsRawHtml = await client.getContent(parseUri(SCHELDUE_DATA_URL) ? {
-        "type": "form",
-        "kaf": KAF_QUERY,
-        "fak": facult.id
-      })
-      formsHtml = parseHtml(formsRawHtml)
-      forms = newSeq[SelectOption]()
+    facultiesResponses.add(spawn threadParseFaculty(site, facult))
 
-    # Парс форм обучения
-    for formElement in formsHtml.findAll("option"):
-      let form = (formElement.attr("value"), formElement.innerText)
-      debug "[getGroups]", fmt"Найдена форма обучения: {$form} ({$facult})"
-      forms.add(form)
-
-    # Проход по формам обучения
-    for form in forms.items:
-      debug "[getGroups]", fmt"Получение курсов для факультета {$facult} ({$form})"
-      var
-        coursesRawHtml = await client.getContent(parseUri(SCHELDUE_DATA_URL) ? {
-          "type": "kurse",
-          "kaf": KAF_QUERY,
-          "fak": facult.id,
-          "form": form[0]
-        })
-        coursesHtml = parseHtml(coursesRawHtml)
-        courses = newSeq[SelectOption]()
-
-      # Парс курсов формы обучения
-      for courseElement in coursesHtml.findAll("option"):
-        let course = (courseElement.attr("value"), courseElement.innerText)
-        debug "[getGroups]", fmt"Найден курс: {$course} ({$facult}, {$form})"
-        courses.add(course)
-
-      # Проход по курсам
-      for course in courses.items:
-        debug "[getGroups]", fmt"Получение групп ({$course}, {$facult}, {$form})"
-        let
-          groupsRawHtml = await client.getContent(parseUri(SCHELDUE_DATA_URL) ? {
-            "type": "group_class",
-            "kaf": KAF_QUERY,
-            "fak": facult.id,
-            "form": form[0],
-            "kurse": course[0]
-          })
-          groupsHtml = parseHtml(groupsRawHtml)
-
-        # Парс групп и сохранение
-        for groupElement in groupsHtml.findAll("option"):
-          let group = Group(
-            site: site,
-            id: groupElement.attr("value"),
-            display: groupElement.innerText,
-            course: parseCourse(course[0]),
-            form: parseForm(form[0]),
-            faculty: parseFaculty(facult.id)
-          )
-          debug "[getGroups]", "Найдена группа", $group
-          site.groups.add(group)
+  for groupsChunk in facultiesResponses:
+    let res = ^groupsChunk
+    for group in res:
+      site.groups.add(group)
 
   # Сортировка групп по курсам/номерам
   debug "[getGroups]", "Сортировка групп по курсам и номерам"
@@ -159,6 +188,7 @@ proc getWeeks*(group: Group): Future[seq[SelectOption]] {.async.} =
   return group.weeks
 
 proc getScheldue*(group: Group, week: SelectOption): Future[seq[ScheldueDay]] {.async.} =
+  # Получение расписания на неделю
   var client = newAsyncHttpClient(sslContext=newContext(verifyMode=CVerifyNone))
   debug "[getScheldue]", fmt"Получение расписания для группы {$group} для {$week}"
   let
