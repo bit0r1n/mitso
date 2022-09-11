@@ -5,16 +5,10 @@ when not isMainModule:
 else:
   import sequtils, strutils, asyncdispatch
   proc main(): Future[void] {.async.} =
-    var parser = newSite()
+    let parser = newSite()
 
-    echo "Загрузка страницы"
-    discard await parser.loadPage()
-
-    echo "Получение факультетов"
-    discard parser.getFaculties()
-
-    echo "Получение групп"
-    discard await parser.getGroups()
+    echo "Получение групп.."
+    discard await parser.init()
 
     echo "Поиск группы \"2121\" второго курса"
     let groups = parser.groups.filter do (x: Group) -> bool: x.display.contains("2121") and x.course == cSecond

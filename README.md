@@ -25,9 +25,7 @@ import mitso
 
 proc main() {.async.} =
   let site = newSite()
-  discard await site.loadPage()
-  discard site.getFaculties()
-  discard await site.getGroups()
+  discard await site.init()
 
   echo "Введи номер группы"
   let

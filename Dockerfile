@@ -1,4 +1,4 @@
-FROM nimlang/nim:latest-alpine
+FROM nimlang/nim:1.6.2-alpine
 
 WORKDIR /mitso
 COPY . .
