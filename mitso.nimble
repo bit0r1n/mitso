@@ -12,3 +12,4 @@ bin           = @["mitso"]
 # Dependencies
 
 requires "nim >= 1.6.2"
+requires "telebot"

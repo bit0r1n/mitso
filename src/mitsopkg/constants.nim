@@ -4,3 +4,4 @@ const SCHELDUE_DATA_URL* = SCHELDUE_BASE & "_update"
 const KAF_QUERY* = "Glavnaya kafedra"
 const INVALID_GROUP_ID* = "Auditoriya" # ???
 const INVALID_TEACHER* = "Преподаватель 0. 0." # =((
+const LESSON_DURATION* = (1_000 * 60) * 80
