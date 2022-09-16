@@ -7,7 +7,10 @@ import std/[
 ]
 import utils, typedefs, helpers, constants
 
-proc newSite*(): Site = Site()
+proc newSite*(): Site =
+  new(result)
+  result.faculties = newSeq[SelectOption]()
+  result.groups = newSeq[Group]()
 
 proc loadPage*(site: Site): Future[string] {.async.} =
   # Получение и сохранение контента сайта
@@ -81,7 +84,8 @@ proc threadParseForm(site: Site, facult: SelectOption, form: SelectOption): seq[
   # Проход по курсам
   var groupsResponses = newSeq[FlowVar[seq[Group]]]()
   for course in courses.items:
-    groupsResponses.add(spawn threadParseCourse(site, facult, form, course))
+    let groupsCourse = spawn threadParseCourse(site, facult, form, course)
+    groupsResponses.add(groupsCourse)
 
   for response in groupsResponses:
     let groups = ^response
