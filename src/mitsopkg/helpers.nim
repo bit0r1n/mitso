@@ -1,10 +1,5 @@
-import strutils, strformat, times
+import strutils, strformat, times, options
 import typedefs, constants
-from math import `^`
-
-proc minskUtcTzInfo(time: Time): ZonedTime =
-  ZonedTime(utcOffset: (60 ^ 2) * 3, isDst: false, time: time)
-let utcMinsk* = newTimezone("Europe/Minsk", minskUtcTzInfo, minskUtcTzInfo)
 
 proc parseTeachers*(rawString: string): seq[string] =
   let strings = rawString.split("\n")
@@ -102,6 +97,8 @@ proc parseLessonType*(lType: string): LessonType =
   case lType:
   of "(лек)":
     return ltpLecture
+  of "(лаб)":
+    return ltpLaboratory
   of "(практическое)", "(практ/сем)":
     return ltpPractice
   of "(диф/зачет)", "(зач)", "(зачет)":
@@ -215,6 +212,8 @@ proc `$`*(lesson: LessonType): string =
     return "Лекция"
   of ltpPractice:
     return "Практика"
+  of ltpLaboratory:
+    return "Лабораторная"
   of ltpCreditCourse:
     return "Зачет"
   of ltpConsultation:
@@ -278,3 +277,34 @@ proc `%`*(faculty: Faculty): string =
     return "ME`OiM"
   of faLegal:
     return "YUridicheskij"
+
+proc newSite*(): Site =
+  new(result)
+  result.faculties = newSeq[SelectOption]()
+  result.groups = newSeq[Group]()
+
+proc newGroup*(site: Site, id, display: string,
+  course: Course, form: Form, faculty: Faculty,
+  weeks: Option[seq[SelectOption]]): Group =
+  result = Group(
+    site: site,
+    id: id,
+    display: display,
+    course: course,
+    form: form,
+    faculty: faculty,
+    weeks: newSeq[SelectOption]()
+  )
+  if weeks.isSome: result.weeks = weeks.get
+
+proc newLesson*(name: string,
+  teachers = newSeq[string](), classrooms = newSeq[string](),
+  date: DateTime, lessonTime: LessonTime, lType: LessonType): Lesson =
+  result = Lesson(
+    date: date,
+    name: name,
+    teachers: teachers,
+    lessonTime: lessonTime,
+    lType: lType,
+    classrooms: classrooms
+  )

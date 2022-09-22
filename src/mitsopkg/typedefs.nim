@@ -57,6 +57,7 @@ type
   LessonType* = enum
     ltpLecture
     ltpPractice
+    ltpLaboratory
     ltpCreditCourse
     ltpConsultation
     ltpExam

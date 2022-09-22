@@ -3,9 +3,16 @@ import mitsopkg/[parser, typedefs, helpers]
 when not isMainModule:
   export parser, typedefs, helpers
 else:
-  import asyncdispatch, os, strutils, options, tables, sequtils, unicode, re
+  import asyncdispatch, os, strutils, options, tables, sequtils, unicode, re, times
   import telebot, redis
   import database
+
+  proc msgLesson(lesson: Lesson): string =
+    var items = @["🍤 " & $lesson.lessonTime, $lesson.lType]
+    if lesson.classrooms.len != 0: items.add("Ауд. " & lesson.classrooms.join(", "))
+    items.add(lesson.name)
+    if lesson.teachers.len != 0: items.add(lesson.teachers.join(", "))
+    result = items.join(" | ")
 
   proc main() {.async.} =
     let
@@ -50,7 +57,7 @@ else:
       else:
         await redisClient.auth(getEnv("DB_AUTH"))
 
-    proc startCommand(b: Telebot, c: Command): Future[bool] {.async, gcsafe.} =
+    proc startCommand(b: Telebot, c: Command): Future[bool] {.async gcsafe.} =
       let uExists = await redisClient.stateExists(c.message.chat.id)
       if not uExists:
         await redisClient.setState(c.message.chat.id, usAskingGroup)
@@ -73,12 +80,17 @@ else:
           discard await b.sendMessage(c.message.chat.id, content)
         return true
 
-    proc updateHandler(b: Telebot, u: Update): Future[bool] {.async, gcsafe.} =
+    proc updateHandler(b: Telebot, u: Update): Future[bool] {.async gcsafe.} =
       if u.callbackQuery.isSome:
-        if u.callbackQuery.get().data.get().startsWith("selectgroup."):
+        let
+          callbackRawCommand = u.callbackQuery.get().data.get()
+          callbackRawSeqCommand = callbackRawCommand.split(".")
+          command = callbackRawSeqCommand[0]
+          val = callbackRawSeqCommand[1]
+        if command == "selectgroup":
           let
             uID = u.callbackQuery.get().fromUser.id
-            gID = u.callbackQuery.get().data.get()["selectgroup.".len..^1]
+            gID = val
 
           await redisClient.setGroup(uID, gID)
           await redisClient.setState(uID, usMainMenu)
@@ -89,6 +101,30 @@ else:
             replyMarkup = keyboards[usMainMenu]
           )
           return true
+        elif command == "selectweek":
+          echo $u
+          let
+            uID = u.callbackQuery.get().fromUser.id
+            weekID = val
+
+            groupID = await redisClient.getGroup(uID)
+            group = (site.groups.filter do (x: Group) -> bool: x.id == groupID)[0]
+            weeks = await group.getWeeks()
+
+            reqWeek = weeks.filter do (x: SelectOption) -> bool: x.id == weekID
+
+          if reqWeek.len == 0:
+            discard await b.sendMessage(uID, "Неделя не нашлась")
+            return true
+
+          let
+            scheldue = await group.getScheldue(reqWeek[0])
+            headerText = "Распиание для " & reqWeek[0].display & " для группы " & group.display & "\n"
+            daysContent = headerText & (scheldue.map do (d: ScheldueDay) -> string:
+                          "🥀 " & d.displayDate & ", " & $d.day & "\n" & d.lessons
+                            .mapIt("\t\t" & msgLesson(it)).join("\n")).join("\n\n")
+
+          discard await b.sendMessage(uID, daysContent)
       if u.message.isSome and u.message.get().text.isSome and not u.message.get().text.get().startsWith('/'):
         let
           uID = u.message.get().chat.id
@@ -121,13 +157,43 @@ else:
         of usChoosingGroup:
           discard await b.sendMessage(uID, "🙄 Где-то выше есть сообщение с группами. Выбери из того сообщения группу")
         of usMainMenu:
+          let
+            uGroup = await redisClient.getGroup(uID)
+            group = site.groups.filter do (x: Group) -> bool: x.id == uGroup
           case content:
-          of "Сегодня":
-            discard await b.sendMessage(uID, "Нет блин завтра")
-          of "Завтра":
-            discard await b.sendMessage(uID, "Нет блин сегодня")
+          of "Сегодня", "Завтра": 
+            let
+              weeks = await group[0].getWeeks()
+              curWeek = weeks.filter do (x: SelectOption) -> bool: x.display == "Текущая неделя"
+            if curWeek.len == 0:
+              discard await b.sendMessage(uID, "🤩 На " & (if content == "Сегодня": "сегодня" else: "завтра") & " нету расписания")
+              return true
+
+            var lookDay = now()
+            if content == "Завтра": lookDay += 1.days
+            let
+              scheldue = await group[0].getScheldue(curWeek[0])
+              curDay = scheldue.filter do (x: ScheldueDay) -> bool:
+                x.date.monthday() == lookDay.monthday()
+
+            if curDay.len == 0:
+              discard await b.sendMessage(uID, "🤩 На " & (if content == "Сегодня": "сегодня" else: "завтра") & " нету расписания")
+              return true
+
+            let headerText = "Распиание на " & (if content == "Сегодня": "сегодня" else: "завтра") & " для группы " & group[0].display & "\n"
+
+            discard await b.sendMessage(uID,
+              headerText & "🥀 " & curDay[0].displayDate & ", " & $curDay[0].day & "\n" & curDay[0].lessons
+                .mapIt("\t\t" & msgLesson(it)).join("\n")
+            )
           of "Неделя":
-            discard await b.sendMessage(uID, "жоска")
+            let
+              weeks = await group[0].getWeeks()
+              buttons = newInlineKeyboardMarkup(weeks.map do (x: SelectOption) -> InlineKeyboardButton:
+                result = initInlineKeyboardButton(x.display)
+                result.callbackData = some("selectweek." & x.id)
+              )
+            discard await b.sendMessage(uID, "Выбери неделю", replyMarkup = buttons)
           of "Сменить группу":
             discard await b.sendMessage(uID, "не")
 

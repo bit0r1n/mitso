@@ -1,6 +1,6 @@
 when not defined(debug):
   switch("d", "release")
 
-# witch("mm", "arc")
+# switch("mm", "arc")
 switch("threads", "on")
 switch("d", "ssl")

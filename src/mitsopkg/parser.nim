@@ -7,11 +7,6 @@ import std/[
 ]
 import utils, typedefs, helpers, constants
 
-proc newSite*(): Site =
-  new(result)
-  result.faculties = newSeq[SelectOption]()
-  result.groups = newSeq[Group]()
-
 proc loadPage*(site: Site): Future[string] {.async.} =
   # Получение и сохранение контента сайта
   var client = newHttpClient(sslContext=newContext(verifyMode=CVerifyNone))
@@ -226,8 +221,7 @@ proc getScheldue*(group: Group, week: SelectOption): Future[seq[ScheldueDay]] {.
               now().year + (if scheldueDayMonth == mJan and now().month == mDec: 1 else: 0),
               scheldueDayMonth,
               parseInt(dateString.split(" ")[0]),
-              3, 0, 0,
-              zone = utcMinsk
+              3, 0, 0
             )
 
           var day = ScheldueDay(
