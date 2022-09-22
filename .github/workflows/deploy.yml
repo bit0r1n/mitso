@@ -5,6 +5,9 @@ on:
   push:
     branches:
       - master
+    tags:
+      - release
+      - hotfix
 
 jobs:
   deploy:
