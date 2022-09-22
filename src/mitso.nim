@@ -123,7 +123,7 @@ else:
 
           let
             scheldue = await group.getScheldue(reqWeek[0])
-            headerText = "Распиание для " & reqWeek[0].display & " для группы " & group.display & "\n"
+            headerText = "Распиание для " & reqWeek[0].display & " группы " & group.display & "\n"
             daysContent = headerText & (scheldue.map do (d: ScheldueDay) -> string:
                           "🥀 " & d.displayDate & ", " & $d.day & "\n" & d.lessons
                             .mapIt("\t\t" & msgLesson(it)).join("\n")).join("\n\n")
