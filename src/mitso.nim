@@ -83,6 +83,7 @@ else:
     proc updateHandler(b: Telebot, u: Update): Future[bool] {.async gcsafe.} =
       if u.callbackQuery.isSome:
         let
+          message = u.callbackQuery.get().message.get()
           callbackRawCommand = u.callbackQuery.get().data.get()
           callbackRawSeqCommand = callbackRawCommand.split(".")
           command = callbackRawSeqCommand[0]
@@ -95,8 +96,9 @@ else:
           await redisClient.setGroup(uID, gID)
           await redisClient.setState(uID, usMainMenu)
 
+          discard await b.deleteMessage(uID, message.id)
           discard await b.sendMessage(
-            u.callbackQuery.get().message.get().chat.id,
+            uID,
             "💀 Выбрана группа " & (site.groups.filter do (x: Group) -> bool: x.id == gID)[0].display,
             replyMarkup = keyboards[usMainMenu]
           )
@@ -112,6 +114,8 @@ else:
             weeks = await group.getWeeks()
 
             reqWeek = weeks.filter do (x: SelectOption) -> bool: x.id == weekID
+
+          discard await b.deleteMessage(uID, message.id)
 
           if reqWeek.len == 0:
             discard await b.sendMessage(uID, "Неделя не нашлась")
