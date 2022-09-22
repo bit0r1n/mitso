@@ -12,5 +12,5 @@ jobs:
     steps:
       - name: Tell API to deploy bot
         run: |
-          curl -X POST ${{ secrets.DEPLOY_URL }}
+          curl -X POST ${{ secrets.DEPLOY_URL }} \
             -H 'Authorization: ${{ secrets.DEPLOY_TOKEN }}'
