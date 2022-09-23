@@ -18,6 +18,7 @@
 
 when not defined(debug):
   switch("d", "release")
+  switch("panics", "off")
 
 # switch("mm", "arc")
 switch("threads", "on")

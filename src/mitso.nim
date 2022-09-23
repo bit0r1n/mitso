@@ -114,7 +114,11 @@ else:
           await redisClient.setGroup(uID, gID)
           await redisClient.setState(uID, usMainMenu)
 
-          discard await b.deleteMessage($uID, message.messageId)
+          try:
+            discard await b.deleteMessage($uID, message.messageId)
+          except:
+            echo "Failed to delete message (selectgroup)"
+
           discard await b.sendMessage(
             uID,
             "💀 Выбрана группа " & (site.groups.filter do (x: Group) -> bool: x.id == gID)[0].display,
@@ -132,7 +136,10 @@ else:
 
             reqWeek = weeks.filter do (x: SelectOption) -> bool: x.id == weekID
 
-          discard await b.deleteMessage($uID, message.messageId)
+          try:
+            discard await b.deleteMessage($uID, message.messageId)
+          except:
+            echo "Failed to delete message (selectweek)"
 
           if reqWeek.len == 0:
             discard await b.sendMessage(uID, "Неделя не нашлась")
