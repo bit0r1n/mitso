@@ -122,7 +122,6 @@ else:
           )
           return true
         elif command == "selectweek":
-          echo $u
           let
             uID = u.callbackQuery.get().fromUser.id
             weekID = val
