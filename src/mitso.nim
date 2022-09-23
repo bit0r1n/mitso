@@ -198,6 +198,7 @@ else:
               return true
 
             var lookDay = now()
+            lookDay += 1.hours
             if content == "Завтра": lookDay += 1.days
             let
               scheldue = await group[0].getScheldue(curWeek[0])
