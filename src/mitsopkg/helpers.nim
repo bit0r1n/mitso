@@ -68,7 +68,7 @@ proc parseFaculty*(faculty: string): Faculty =
   case faculty:
   of "Magistratura":
     return faMagistracy
-  of "ME`OiM":
+  of "E`konomicheskij":
     return faEconomical
   of "YUridicheskij":
     return faLegal
@@ -292,7 +292,7 @@ proc `%`*(faculty: Faculty): string =
   of faMagistracy:
     return "Magistratura"
   of faEconomical:
-    return "ME`OiM"
+    return "E`konomicheskij"
   of faLegal:
     return "YUridicheskij"
 
