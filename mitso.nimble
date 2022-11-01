@@ -30,4 +30,4 @@ bin           = @["mitso"]
 # Dependencies
 
 requires "nim >= 1.6.2"
-requires "telebot, nimongo, jsony"
+requires "telebot, redis#head, jsony"
