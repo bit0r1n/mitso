@@ -79,3 +79,4 @@ type
     ltpCreditCourse
     ltpConsultation
     ltpExam
+    ltpCourseProject
