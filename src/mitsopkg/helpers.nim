@@ -111,6 +111,25 @@ proc parseDay*(day: string): WeekDay =
   of "Воскресенье":
     return dSun
 
+proc parseDay*(dayOfWeek: int): WeekDay =
+  case dayOfWeek:
+  of 0:
+    return dMon
+  of 1:
+    return dTue
+  of 2:
+    return dWed
+  of 3:
+    return dThu
+  of 4:
+    return dFri
+  of 5:
+    return dSat
+  of 6:
+    return dSun
+  else:
+    raise newException(ValueError, "Invalid day of week")
+
 proc parseLessonType*(lType: string): LessonType =
   case lType:
   of "лек":

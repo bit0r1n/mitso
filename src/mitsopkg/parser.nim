@@ -21,7 +21,7 @@ import std/[
   htmlparser, xmltree, strtabs,
   uri, options, strformat,
   algorithm, sequtils, strutils,
-  times, threadpool, json, os
+  times, threadpool, json, nre
 ]
 import utils, typedefs, helpers, constants
 
@@ -232,7 +232,7 @@ proc getWeeks*(group: Group): Future[seq[SelectOption]] {.async.} =
 
   for week in weeksJson["output"]:
     let weekId = week["id"].getInt()
-    group.weeks.add(($weekId, if weekId > 0: $(weekId + 1) & " неделя" else: "Текушая неделя"))
+    group.weeks.add(($weekId, if weekId > 0: $(weekId + 1) & " неделя" else: "Текущая неделя"))
 
   debug "[getWeeks]", "Получены недели для группы", $group, $group.weeks
 
@@ -264,11 +264,11 @@ proc getScheldue*(group: Group, week: SelectOption): Future[seq[ScheldueDay]] {.
     for item in el.items:
       if item.kind == xnElement:
         if item.tag == "h2":
-          if eI != 0: days.add(day)
           eI += 1
 
           day = ScheldueDay()
           day.displayDate = item.innerText
+          day.day = parseDay(eI - 1)
           let
             scheldueDayMonth = parseMonth(item.innerText().split(" ")[1])
             dayTime = dateTime(
@@ -287,6 +287,7 @@ proc getScheldue*(group: Group, week: SelectOption): Future[seq[ScheldueDay]] {.
             var lesson = Lesson()
             let tds = trDay.findAll("td").filter do (x: XmlNode) -> bool: x.kind == xnElement
             if tds[1].innerText().contains("(нет занятий)"): continue
+            if tds[1].innerText.replace("\n", " ").match(re"^\d\. -$").isSome: continue
 
             var ls = parseLessonName(tds[1].innerText.replace("\n", " "))
 
@@ -304,5 +305,7 @@ proc getScheldue*(group: Group, week: SelectOption): Future[seq[ScheldueDay]] {.
               lessonDate += initDuration(hours = ($%lesson.lessonTime).hours, minutes = ($%lesson.lessonTime).minutes)
 
               day.lessons.add(lesson)
+          if day.lessons.len > 0: days.add(day)
+
 
   return days
