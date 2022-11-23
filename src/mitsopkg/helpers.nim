@@ -18,6 +18,7 @@
 
 import strutils, strformat, times, options, nre, httpclient, uri, asyncdispatch
 import typedefs, constants
+import telebot
 
 proc parseTeachers*(rawString: string): seq[string] =
   let strings = rawString.split("\n")
@@ -356,6 +357,13 @@ proc newLesson*(name: string,
     lType: lType,
     classrooms: classrooms
   )
+
+proc generateKeyboardMarkup*(buttons: seq[InlineKeyboardButton], size = 3): InlineKeyboardMarkup =
+  new(result)
+  result.kind = kInlineKeyboardMarkup
+  for i, button in buttons:
+    if i mod size == 0: result.inlineKeyboard.add(newSeq[InlineKeyBoardButton]())
+    result.inlineKeyboard[^1].add(button)
 
 proc requestWithRetry*(client: HttpClient | AsyncHttpClient; url: Uri | string;
              httpMethod: HttpMethod | string = HttpGet; body = "";

@@ -218,7 +218,7 @@ else:
           of "Неделя":
             let
               weeks = await group[0].getWeeks()
-              buttons = newInlineKeyboardMarkup(weeks.map do (x: SelectOption) -> InlineKeyboardButton:
+              buttons = generateKeyboardMarkup(weeks.map do (x: SelectOption) -> InlineKeyboardButton:
                 result = initInlineKeyboardButton(x.display)
                 result.callbackData = some("selectweek." & x.id)
               )
