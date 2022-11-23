@@ -144,7 +144,7 @@ proc parseLessonType*(lType: string): LessonType =
     return ltpConsultation
   of "экзамен":
     return ltpExam
-  of "(курс/проект)":
+  of "курс/проект":
     return ltpCourseProject
 
 proc parseMonth*(month: string): Month =
