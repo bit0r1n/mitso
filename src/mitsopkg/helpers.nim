@@ -361,9 +361,9 @@ proc requestWithRetry*(client: HttpClient | AsyncHttpClient; url: Uri | string;
              httpMethod: HttpMethod | string = HttpGet; body = "";
              headers: HttpHeaders = nil; multipart: MultipartData = nil): Future[Response | AsyncResponse] {.multisync.} =
   try:
-    result = client.request(url, httpMethod, body, headers, multipart)
+    result = await client.request(url, httpMethod, body, headers, multipart)
   except:
-    result = client.requestWithRetry(url, httpMethod, body, headers, multipart)
+    result = await client.requestWithRetry(url, httpMethod, body, headers, multipart)
 
 converter toFullString*(values: HttpHeaderValues): string =
   return seq[string](values).join("; ")
