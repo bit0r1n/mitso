@@ -16,10 +16,12 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 ]#
 
-import options, times
+import options, times, httpcore
 
 type
   Site* = ref object
+    csrfToken*: Option[string]
+    cookies*: HttpHeaderValues
     content*: Option[string]
     faculties*: seq[SelectOption]
     groups*: seq[Group]

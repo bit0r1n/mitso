@@ -16,10 +16,11 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 ]#
 
-const SCHELDUE_BASE* = "https://www.mitso.by/schedule"
-const SCHELDUE_URL* = SCHELDUE_BASE & "/search"
-const SCHELDUE_DATA_URL* = SCHELDUE_BASE & "_update"
-const KAF_QUERY* = "Glavnaya kafedra"
+const SCHELDUE_BASE* = "https://apps.mitso.by/schedule"
+const SCHELDUE_FORMS* = SCHELDUE_BASE & "/education"
+const SCHELDUE_COURSE* = SCHELDUE_BASE & "/course"
+const SCHELDUE_GROUP* = SCHELDUE_BASE & "/group"
+const SCHELDUE_WEEK* = SCHELDUE_BASE & "/week"
 const INVALID_GROUP_ID* = "Auditoriya" # ???
 const INVALID_TEACHER* = "Преподаватель 0. 0." # =((
 const LESSON_DURATION* = (1_000 * 60) * 80

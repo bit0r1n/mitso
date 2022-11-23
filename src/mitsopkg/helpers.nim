@@ -16,7 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 ]#
 
-import strutils, strformat, times, options
+import strutils, strformat, times, options, nre, httpcore
 import typedefs, constants
 
 proc parseTeachers*(rawString: string): seq[string] =
@@ -77,21 +77,21 @@ proc parseFaculty*(faculty: string): Faculty =
 
 proc parseTime*(time: string): LessonTime =
   case time:
-  of "8.00-9.20":
+  of "8.00 - 9.20":
     return ltFirst
-  of "09:35-10:55":
+  of "09:35 - 10:55":
     return ltSecond
-  of "11:05-12:25":
+  of "11:05 - 12:25":
     return ltThird
-  of "13:00-14:20":
+  of "13:00 - 14:20":
     return ltFourth
-  of "14:35-15:55":
+  of "14:35 - 15:55":
     return ltFifth
-  of "16:25-17:45":
+  of "16:25 - 17:45":
     return ltSixth
-  of "17:55-19:15":
+  of "17:55 - 19:15":
     return ltSeventh
-  of "19.25-20.45":
+  of "19.25 - 20.45":
     return ltEighth
 
 proc parseDay*(day: string): WeekDay =
@@ -113,17 +113,17 @@ proc parseDay*(day: string): WeekDay =
 
 proc parseLessonType*(lType: string): LessonType =
   case lType:
-  of "(лек)":
+  of "лек":
     return ltpLecture
-  of "(лаб)":
+  of "лаб":
     return ltpLaboratory
-  of "(практическое)", "(практ/сем)":
+  of "практическое", "практ/сем":
     return ltpPractice
-  of "(диф/зачет)", "(зач)", "(зачет)":
+  of "диф/зачет", "зач", "зачет":
     return ltpCreditCourse
-  of "(конс)":
+  of "конс":
     return ltpConsultation
-  of "(экзамен)":
+  of "экзамен":
     return ltpExam
 
 proc parseMonth*(month: string): Month =
@@ -152,6 +152,13 @@ proc parseMonth*(month: string): Month =
     return mNov
   of "декабря":
     return mDec
+
+proc parseLessonName*(name: string): tuple[lessonName: string, lessonType: LessonType, teacher: string] =
+  var r = re"(\d\. )?(.*) \((.*)\) (.*)$"
+  var m = name.find(r).get().captures
+  result.lessonName = m[1]
+  result.lessonType = parseLessonType(m[2])
+  result.teacher = m[3]
 
 proc `$`*(form: Form): string =
   case form:
@@ -326,3 +333,6 @@ proc newLesson*(name: string,
     lType: lType,
     classrooms: classrooms
   )
+
+converter toFullString*(values: HttpHeaderValues): string =
+  return seq[string](values).join("; ")

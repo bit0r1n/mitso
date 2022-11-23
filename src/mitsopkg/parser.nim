@@ -21,7 +21,7 @@ import std/[
   htmlparser, xmltree, strtabs,
   uri, options, strformat,
   algorithm, sequtils, strutils,
-  times, threadpool
+  times, threadpool, json, os
 ]
 import utils, typedefs, helpers, constants
 
@@ -29,10 +29,29 @@ proc loadPage*(site: Site): Future[string] {.async.} =
   # Получение и сохранение контента сайта
   var client = newHttpClient(sslContext=newContext(verifyMode=CVerifyNone))
   debug "[loadPage]", "Получение контента базовой страницы"
-  let content = client.getContent(SCHELDUE_URL)
+  let response = client.get(SCHELDUE_BASE)
   debug "[loadPage]", "Контент получен, сохранение"
-  site.content = some content
-  return content
+  site.content = some response.body
+
+  # get cookies from headers and save them
+  debug "[loadPage]", "Получение куков"
+  site.cookies = response.headers["Set-Cookie"]
+  
+
+  # get csrf token from meta tag (name = csrf-token, content = token)
+  let
+    doc = parseHtml(site.content.get)
+    meta = doc.findAll("meta")
+  for m in meta:
+    if m.attrs.hasKey("name") and m.attrs["name"] == "csrf-token":
+      debug "[loadPage]", "CSRF токен получен"
+      site.csrfToken = some m.attrs["content"]
+      break
+
+  if site.csrfToken.isNone:
+    raise newException(ValueError, "CSRF token not found")
+
+  return site.content.get
 
 proc getFaculties*(site: Site): seq[SelectOption] =
   # Получение и сохранение факультетов
@@ -41,9 +60,9 @@ proc getFaculties*(site: Site): seq[SelectOption] =
   result = @[]
   site.faculties.setLen(0)
   for select in html.findAll("select"):
-    if select.attrs.hasKey("id") and select.attrs["id"] == "fak_select":
+    if select.attrs.hasKey("id") and select.attrs["id"] == "faculty-id":
       for x in select.items:
-        if x.kind == xnElement:
+        if x.kind == xnElement and x.attr("value") != "":
           let facult = (id: x.attr("value"), display: x.innerText)
           debug "[getFaculties]", "Найден факультет", $facult
           result.add(facult)
@@ -51,48 +70,50 @@ proc getFaculties*(site: Site): seq[SelectOption] =
 
 proc threadParseCourse(site: Site, facult: SelectOption, form: SelectOption, course: SelectOption): seq[Group] =
   var client = newHttpClient(sslContext=newContext(verifyMode=CVerifyNone))
+  client.headers = newHttpHeaders({ "Content-Type": "application/x-www-form-urlencoded", "X-CSRF-Token": site.csrfToken.get, "Cookie": site.cookies.toFullString() })
   debug "[threadParseCourse]", fmt"Получение групп ({$course}, {$facult}, {$form})"
   let
-    groupsRawHtml = client.getContent(parseUri(SCHELDUE_DATA_URL) ? {
-      "type": "group_class",
-      "kaf": KAF_QUERY,
-      "fak": facult.id,
-      "form": form.id,
-      "kurse": course.id
-    })
-    groupsHtml = parseHtml(groupsRawHtml)
+    groupsRawJson = client.postContent(parseUri(SCHELDUE_GROUP), 
+      body = encodeQuery({
+      "depdrop_parents[0]": facult.id,
+      "depdrop_parents[1]": form.id,
+      "depdrop_parents[2]": course.id,
+      "depdrop_all_params[faculty-id]": facult.id,
+      "depdrop_all_params[form-id]": form.id,
+      "depdrop_all_params[course-id]": course.id
+    }))
+    groupsJson = parseJson(groupsRawJson)
 
-  # Парс групп и сохранение
-  for groupElement in groupsHtml.findAll("option"):
+  for groupElem in groupsJson["output"]:
     let group = Group(
       site: site,
-      id: groupElement.attr("value"),
-      display: groupElement.innerText,
-      course: parseCourse(course[0]),
-      form: parseForm(form[0]),
+      id: groupElem["id"].getStr(),
+      display: groupElem["name"].getStr(),
+      course: parseCourse(course.id),
+      form: parseForm(form.id),
       faculty: parseFaculty(facult.id)
     )
     debug "[threadParseCourse]", "Найдена группа", $group
-    result.add(group)
+    result.add(group)    
 
 proc threadParseForm(site: Site, facult: SelectOption, form: SelectOption): seq[Group] =
   var client = newHttpClient(sslContext=newContext(verifyMode=CVerifyNone))
+  client.headers = newHttpHeaders({ "Content-Type": "application/x-www-form-urlencoded", "X-CSRF-Token": site.csrfToken.get, "Cookie": site.cookies.toFullString() })
   debug "[threadParseForm]", fmt"Получение курсов для факультета {$facult} ({$form})"
   var
-    coursesRawHtml = client.getContent(parseUri(SCHELDUE_DATA_URL) ? {
-      "type": "kurse",
-      "kaf": KAF_QUERY,
-      "fak": facult.id,
-      "form": form.id
-    })
-    coursesHtml = parseHtml(coursesRawHtml)
+    coursesRawJson = client.postContent(parseUri(SCHELDUE_COURSE), 
+      body = encodeQuery({
+      "depdrop_parents[0]": facult.id,
+      "depdrop_parents[1]": form.id,
+      "depdrop_all_params[faculty-id]": facult.id,
+      "depdrop_all_params[form-id]": form.id,
+    }))
+    coursesJson = parseJson(coursesRawJson)
     courses = newSeq[SelectOption]()
 
   # Парс курсов формы обучения
-  for courseElement in coursesHtml.findAll("option"):
-    let course = (courseElement.attr("value"), courseElement.innerText)
-    debug "[threadParseForm]", fmt"Найден курс: {$course} ({$facult}, {$form})"
-    courses.add(course)
+  for course in coursesJson["output"].getElems():
+    courses.add((id: course["id"].getStr, display: course["name"].getStr))
 
   # Проход по курсам
   var groupsResponses = newSeq[FlowVar[seq[Group]]]()
@@ -107,20 +128,18 @@ proc threadParseForm(site: Site, facult: SelectOption, form: SelectOption): seq[
 
 proc threadParseFaculty(site: Site, facult: SelectOption): seq[Group] =
   var client = newHttpClient(sslContext=newContext(verifyMode=CVerifyNone))
+  client.headers = newHttpHeaders({ "Content-Type": "application/x-www-form-urlencoded", "X-CSRF-Token": site.csrfToken.get, "Cookie": site.cookies.toFullString() })
   debug "[threadParseFaculty]", "Получение форм обучения для факультета", $facult
   var
-    formsRawHtml = client.getContent(parseUri(SCHELDUE_DATA_URL) ? {
-      "type": "form",
-      "kaf": KAF_QUERY,
-      "fak": facult.id
-    })
-    formsHtml = parseHtml(formsRawHtml)
+    formsRawJson = client.postContent(parseUri(SCHELDUE_FORMS), 
+      body = encodeQuery({ "depdrop_parents[0]": facult.id, "depdrop_all_params[faculty-id]": facult.id }))
+    formsJson = parseJson(formsRawJson)
     forms = newSeq[SelectOption]()
 
   # Парс форм обучения
-  for formElement in formsHtml.findAll("option"):
-    let form = (formElement.attr("value"), formElement.innerText)
-    debug "[threadParseFaculty]", fmt"Найдена форма обучения: {$form} ({$facult})"
+  for form in formsJson["output"].getElems():
+    let form = (form["id"].getStr(), form["name"].getStr())
+    debug "[threadParseFaculty]", "Найдена форма обучения", $form
     forms.add(form)
 
   # Проход по формам обучения
@@ -188,27 +207,32 @@ proc init*(site: Site): Future[Site] {.async.} =
 proc getWeeks*(group: Group): Future[seq[SelectOption]] {.async.} =
   # Получение доступных недель для группы
   var client = newAsyncHttpClient(sslContext=newContext(verifyMode=CVerifyNone))
+  client.headers = newHttpHeaders({ "Content-Type": "application/x-www-form-urlencoded", "X-CSRF-Token": group.site.csrfToken.get, "Cookie": group.site.cookies.toFullString() })
   debug "[getWeeks]", "Получение доступных недель для группы", $group
   let
-    weeksRawHtml = await client.getContent(parseUri(SCHELDUE_DATA_URL) ? {
-      "type": "date",
-      "fak": %group.faculty,
-      "kaf": KAF_QUERY,
-      "form": %group.form,
-      "kurse": %group.course,
-      "group_class": group.id
-    })
-    weeksHtml = parseHtml(weeksRawHtml)
+    weeksRawJson = await client.postContent(parseUri(SCHELDUE_WEEK), 
+      body = encodeQuery({
+      "depdrop_parents[0]": %group.faculty,
+      "depdrop_parents[1]": %group.form,
+      "depdrop_parents[2]": %group.course,
+      "depdrop_parents[3]": group.id,
+      "depdrop_all_params[faculty-id]": %group.faculty,
+      "depdrop_all_params[form-id]": %group.form,
+      "depdrop_all_params[course-id]": %group.course,
+      "depdrop_all_params[group-id]": group.id,
+    }))
+    weeksJson = parseJson(weeksRawJson)
 
   group.weeks.setLen(0)
 
-  if (weeksRawHtml.len == 1):
+  if (weeksJson["output"].len == 0):
     debug "[getWeeks]", "Не нашлось доступных недель для", $group
     group.weeks = @[]
     return group.weeks
 
-  for weekElement in weeksHtml.findAll("option"):
-    group.weeks.add((weekElement.attr("value"), weekElement.innerText))
+  for week in weeksJson["output"]:
+    let weekId = week["id"].getInt()
+    group.weeks.add(($weekId, if weekId > 0: $(weekId + 1) & " неделя" else: "Текушая неделя"))
 
   debug "[getWeeks]", "Получены недели для группы", $group, $group.weeks
 
@@ -217,74 +241,68 @@ proc getWeeks*(group: Group): Future[seq[SelectOption]] {.async.} =
 proc getScheldue*(group: Group, week: SelectOption): Future[seq[ScheldueDay]] {.async.} =
   # Получение расписания на неделю
   var client = newAsyncHttpClient(sslContext=newContext(verifyMode=CVerifyNone))
+  client.headers = newHttpHeaders({ "Content-Type": "application/x-www-form-urlencoded", "X-CSRF-Token": group.site.csrfToken.get, "Cookie": group.site.cookies.toFullString() })
   debug "[getScheldue]", fmt"Получение расписания для группы {$group} для {$week}"
   let
-    sheldueRawHtml = await client.getContent(parseUri(SCHELDUE_BASE) / %group.form / %group.faculty / %group.course / group.id / week.id)
+    sheldueRawHtml = await client.postContent(SCHELDUE_BASE,
+      body = encodeQuery({
+        "ScheduleSearch[fak]": %group.faculty,
+        "ScheduleSearch[form]": %group.form,
+        "ScheduleSearch[kurse]": %group.course,
+        "ScheduleSearch[group_class]": group.id,
+        "ScheduleSearch[week]": week.id,
+      }))
     scheldueHtml = parseHtml(sheldueRawHtml)
   var days = newSeq[ScheldueDay]()
 
-  for divElement in scheldueHtml.findAll("div"):
-    if divElement.attr("class") == "rp-ras": # блок недели
-      for dayElem in divElement.items: # прохождение по дням
-        if dayElem.kind == xnElement:
-          let dayElements = dayElem.findAll("div").filter do (x: XmlNode) -> bool:
-            x.kind == xnElement
+  for el in scheldueHtml.findAll("div"):
+    if el.attr("class") != "container" and el.child("table") != nil: continue
 
+    var lessons = newSeq[Lesson]()
+    var day: ScheldueDay
+    var eI = 0
+    for item in el.items:
+      if item.kind == xnElement:
+        if item.tag == "h2":
+          if eI != 0: days.add(day)
+          eI += 1
+
+          day = ScheldueDay()
+          day.displayDate = item.innerText
           let
-            dateString = dayElements[0].innerText
-            dayString = dayElements[1].innerText
-            lessonsElements = dayElements[2].findAll("div")
-            scheldueDayMonth = parseMonth(dateString.split(" ")[1])
+            scheldueDayMonth = parseMonth(item.innerText().split(" ")[1])
             dayTime = dateTime(
               now().year + (if scheldueDayMonth == mJan and now().month == mDec: 1 else: 0),
               scheldueDayMonth,
-              parseInt(dateString.split(" ")[0]),
+              parseInt(item.innerText().split(" ")[0]),
               3, 0, 0
             )
+          day.date = dayTime
+          lessons.setLen(0)
+        elif item.tag == "table":
+          let trs = item.findAll("tr").filter do (x: XmlNode) -> bool: x.kind == xnElement
+          for i, trDay in trs:
+            if trDay.kind != xnElement: continue
+            if i == 0: continue
+            var lesson = Lesson()
+            let tds = trDay.findAll("td").filter do (x: XmlNode) -> bool: x.kind == xnElement
+            if tds[1].innerText().contains("(нет занятий)"): continue
 
-          var day = ScheldueDay(
-            date: dayTime,
-            displayDate: dateString,
-            day: parseDay(dayString),
-            lessons: newSeq[Lesson]()
-          )
+            var ls = parseLessonName(tds[1].innerText.replace("\n", " "))
 
-          debug "[getScheldue]", "Парс расписания для " & dateString
-          
-          for lessonElement in lessonsElements.items: # прохождение по занятиям
-            let lessonElements = lessonElement.findAll("div")
+            if day.lessons.len != 0 and ls.lessonName == day.lessons[^1].name and ls.lessonType == day.lessons[^1].lType:
+              day.lessons[^1].classrooms.add(tds[2].innerText)
+              day.lessons[^1].teachers.add(ls.teacher)
+            else:
+              lesson.name = ls.lessonName
+              lesson.lType = ls.lessonType
+              if ls.teacher != INVALID_TEACHER: lesson.teachers.add(ls.teacher)
+              if tds[2].innerText().len > 0: lesson.classrooms.add(tds[2].innerText())
+              lesson.lessonTime = parseTime(tds[0].innerText)
 
-            if (lessonElements.filter do (x: XmlNode) -> bool:
-              x.attr("class") == "rp-r-aud").len == 0: continue # нету элемента с аудиторией = нету занятия
+              var lessonDate = day.date
+              lessonDate += initDuration(hours = ($%lesson.lessonTime).hours, minutes = ($%lesson.lessonTime).minutes)
 
-            let
-              timeString = lessonElements[0].innerText
-              lessonStrings = lessonElements[1].child("div").innerText.split("\n")
-              classroomString = lessonElements[3].innerText
-
-              # если элементов 5 - занятие проходит в двух аудитория с двумя преподавателями (лаба короче), в начале названий занятия есть пункт "N. "
-              lessonName = if lessonStrings.len == 5: lessonStrings[0][3..^1] else: lessonStrings[0]
-              teachers = parseTeachers($lessonElements[1].child("div"))
-              classrooms = parseClassrooms(classroomString)
-              lessonTime = parseTime(timeString)
-
-            var lessonDateTime = dayTime
-            lessonDateTime += initDuration(hours = ($%lessonTime).hours, minutes = ($%lessonTime).minutes)
-
-            var lesson = Lesson(
-                date: lessonDateTime,
-                lessonTime: lessonTime,
-                name: lessonName,
-                lType: parseLessonType(lessonStrings[1])
-              )
-
-            if teachers.len != 0:
-              lesson.teachers = teachers
-
-            if classrooms.len != 0:
-              lesson.classrooms = classrooms
-
-            day.lessons.add(lesson)
-          if day.lessons.len != 0: days.add(day)
+              day.lessons.add(lesson)
 
   return days
