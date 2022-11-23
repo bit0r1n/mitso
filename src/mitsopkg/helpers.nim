@@ -125,6 +125,8 @@ proc parseLessonType*(lType: string): LessonType =
     return ltpConsultation
   of "экзамен":
     return ltpExam
+  of "(курс/проект)":
+    return ltpCourseProject
 
 proc parseMonth*(month: string): Month =
   case month:
@@ -245,6 +247,8 @@ proc `$`*(lesson: LessonType): string =
     return "Консультация"
   of ltpExam:
     return "Экзамен"
+  of ltpCourseProject:
+    return "Курсовая"
 
 proc `$`*(lesson: Lesson): string =
   var items = @[$lesson.lessonTime]
