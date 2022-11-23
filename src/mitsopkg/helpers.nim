@@ -360,11 +360,10 @@ proc newLesson*(name: string,
 proc requestWithRetry*(client: HttpClient | AsyncHttpClient; url: Uri | string;
              httpMethod: HttpMethod | string = HttpGet; body = "";
              headers: HttpHeaders = nil; multipart: MultipartData = nil): Future[Response | AsyncResponse] {.multisync.} =
-  let response = await client.request(url, httpMethod, body, headers, multipart)
-  if response.code.is2xx:
-    return response
-  else:
-    return await requestWithRetry(client, url, httpMethod, body, headers, multipart)
+  try:
+    result = client.request(url, httpMethod, body, headers, multipart)
+  except:
+    result = client.requestWithRetry(url, httpMethod, body, headers, multipart)
 
 converter toFullString*(values: HttpHeaderValues): string =
   return seq[string](values).join("; ")
