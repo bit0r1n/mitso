@@ -24,10 +24,11 @@ description   = "крутой бот митсо расписание арбуз 
 license       = "GPL-3.0-or-later"
 srcDir        = "src"
 installExt    = @["nim"]
+binDir        = "bin"
 bin           = @["mitso"]
 
 
 # Dependencies
 
 requires "nim >= 1.6.2"
-requires "telebot, redis#head, jsony"
+requires "telebot, redis#head"

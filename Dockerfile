@@ -8,4 +8,4 @@ COPY . .
 
 RUN [ "nimble", "-y", "build" ]
 
-ENTRYPOINT [ "./mitso" ]
+ENTRYPOINT [ "./bin/mitso" ]

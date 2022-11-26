@@ -200,8 +200,13 @@ else:
             var lookDay = now()
             lookDay += 3.hours
             if content == "Завтра": lookDay += 1.days
-            let
+            var
               scheldue = await group[0].getScheldue(curWeek[0])
+              curDay = scheldue.filter do (x: ScheldueDay) -> bool:
+                x.date.monthday() == lookDay.monthday()
+
+            if scheldue[0].date < lookDay and (weeks.filter do (x: SelectOption) -> bool: x.display == "2 неделя").len > 0:
+              scheldue = await group[0].getScheldue((weeks.filter do (x: SelectOption) -> bool: x.display == "2 неделя")[0])
               curDay = scheldue.filter do (x: ScheldueDay) -> bool:
                 x.date.monthday() == lookDay.monthday()
 
@@ -218,7 +223,7 @@ else:
           of "Неделя":
             let
               weeks = await group[0].getWeeks()
-              buttons = generateKeyboardMarkup(weeks.map do (x: SelectOption) -> InlineKeyboardButton:
+              buttons = newInlineKeyboardMarkup(weeks.map do (x: SelectOption) -> InlineKeyboardButton:
                 result = initInlineKeyboardButton(x.display)
                 result.callbackData = some("selectweek." & x.id)
               )
