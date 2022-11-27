@@ -291,9 +291,11 @@ proc getScheldue*(group: Group, week: SelectOption): Future[seq[ScheldueDay]] {.
             if tds[1].innerText().contains("(нет занятий)"): continue
             if tds[1].innerText.replace("\n", " ").match(re"^\d\. -$").isSome: continue
 
-            var ls = parseLessonName(tds[1].innerText.replace("\n", " "))
+            var
+              ls = parseLessonName(tds[1].innerText.replace("\n", " "))
+              time = parseTime(tds[0].innerText)
 
-            if day.lessons.len != 0 and ls.lessonName == day.lessons[^1].name and ls.lessonType == day.lessons[^1].lType:
+            if day.lessons.len != 0 and ls.lessonName == day.lessons[^1].name and ls.lessonType == day.lessons[^1].lType and time == day.lessons[^1].lessonTime:
               day.lessons[^1].classrooms.add(tds[2].innerText)
               day.lessons[^1].teachers.add(ls.teacher)
             else:
