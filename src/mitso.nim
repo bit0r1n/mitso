@@ -197,8 +197,12 @@ else:
               discard await b.sendMessage(uID, "🤩 На " & (if content == "Сегодня": "сегодня" else: "завтра") & " нету расписания")
               return true
 
+            
+            # get time start of week (monday 00:00)
             var lookDay = now()
+            lookDay = lookDay - initDuration(seconds = (int(lookDay.weekday) - 1) * 24 * 60 * 60)
             lookDay += 3.hours
+
             if content == "Завтра": lookDay += 1.days
             var
               scheldue = await group[0].getScheldue(curWeek[0])
