@@ -197,22 +197,18 @@ else:
               discard await b.sendMessage(uID, "🤩 На " & (if content == "Сегодня": "сегодня" else: "завтра") & " нету расписания")
               return true
 
-            
-            # get time start of week (monday 00:00)
             var lookDay = now()
-            lookDay = lookDay - initDuration(seconds = (int(lookDay.weekday) - 1) * 24 * 60 * 60)
-            lookDay += 3.hours
-
+            lookDay += 3.hoursz
             if content == "Завтра": lookDay += 1.days
             var
               scheldue = await group[0].getScheldue(curWeek[0])
               curDay = scheldue.filter do (x: ScheldueDay) -> bool:
                 x.date.monthday() == lookDay.monthday()
 
-            if scheldue[0].date < lookDay and (weeks.filter do (x: SelectOption) -> bool: x.display == "2 неделя").len > 0:
+            #[ if scheldue[0].date < lookDay and (weeks.filter do (x: SelectOption) -> bool: x.display == "2 неделя").len > 0:
               scheldue = await group[0].getScheldue((weeks.filter do (x: SelectOption) -> bool: x.display == "2 неделя")[0])
               curDay = scheldue.filter do (x: ScheldueDay) -> bool:
-                x.date.monthday() == lookDay.monthday()
+                x.date.monthday() == lookDay.monthday() ]#
 
             if curDay.len == 0:
               discard await b.sendMessage(uID, "🤩 На " & (if content == "Сегодня": "сегодня" else: "завтра") & " нету расписания")
