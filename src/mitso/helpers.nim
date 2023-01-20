@@ -17,7 +17,7 @@
 ]#
 
 import strutils, strformat, times, options, nre, httpclient, uri, asyncdispatch
-import typedefs, constants
+import typedefs, private/constants
 import telebot
 
 proc parseTeachers*(rawString: string): seq[string] =

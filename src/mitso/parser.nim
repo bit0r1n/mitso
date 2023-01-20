@@ -23,7 +23,7 @@ import std/[
   algorithm, sequtils, strutils,
   times, threadpool, json, nre
 ]
-import utils, typedefs, helpers, constants
+import private/[utils, constants], typedefs, helpers
 
 proc loadPage*(site: Site): Future[string] {.async.} =
   # Получение и сохранение контента сайта

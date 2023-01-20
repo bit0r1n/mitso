@@ -10,7 +10,7 @@
 ## Пример использования
 ```nim
 import asyncdispatch, sequtils, strutils
-import mitso
+import mitso/[parser, typedefs]
 
 proc main() {.async.} =
   let site = newSite()
