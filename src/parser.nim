@@ -194,12 +194,12 @@ proc getGroups*(site: Site): Future[seq[Group]] {.async.} =
       return simGroups[0] != x
   return site.groups
 
-proc init*(site: Site): Future[Site] {.async.} =
-  debug "[init]", "Загрузка страницы"
+proc loadGroups*(site: Site): Future[Site] {.async.} =
+  debug "[loadGroups]", "Загрузка страницы"
   discard await site.loadPage()
-  debug "[init]", "Парс факультетов"
+  debug "[loadGroups]", "Парс факультетов"
   discard site.getFaculties()
-  debug "[init]", "Парс групп"
+  debug "[loadGroups]", "Парс групп"
   discard await site.getGroups()
 
   result = site
