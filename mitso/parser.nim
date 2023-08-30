@@ -302,7 +302,7 @@ proc getSchedule*(group: Group, week: string): Future[seq[ScheduleDay]] {.async.
             else:
               lesson.name = ls.lessonName
               lesson.lType = ls.lessonType
-              if ls.teacher != INVALID_TEACHER: lesson.teachers.add(ls.teacher)
+              if ls.teacher notin INVALID_TEACHERS: lesson.teachers.add(ls.teacher)
               if tds[2].innerText().len > 0: lesson.classrooms.add(tds[2].innerText())
               lesson.lessonTime = parseTime(tds[0].innerText)
 

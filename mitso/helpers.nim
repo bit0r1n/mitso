@@ -29,7 +29,7 @@ proc parseTeachers*(rawString: string): seq[string] =
     result.add(strings[4][0..^7]) # убирается "</div>"
   else:
     let str = strings[2][0..^7]
-    if str != INVALID_TEACHER: result.add(str)
+    if str notin INVALID_TEACHERS: result.add(str)
 
 proc parseClassrooms*(rawString: string): seq[string] =
   if rawString.len == "Ауд. ".len: return @[] # актуально для занятий по физкультуре, по другим не видел
