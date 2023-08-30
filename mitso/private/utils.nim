@@ -24,7 +24,7 @@ proc debug*(args: varargs[string, `$`]): void =
 
 proc requestWithRetry*(client: HttpClient | AsyncHttpClient; url: Uri | string;
              httpMethod: HttpMethod | string = HttpGet; body = "";
-             headers: HttpHeaders = nil; multipart: MultipartData = nil): Future[Response | AsyncResponse] {.multisync.} =
+             headers: HttpHeaders = nil; multipart: MultipartData = nil): Future[Response | AsyncResponse] {.multisync, gcsafe.} =
   try:
     result = await client.request(url, httpMethod, body, headers, multipart)
   except:

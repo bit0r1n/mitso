@@ -205,7 +205,7 @@ proc loadGroups*(site: Site): Future[Site] {.async.} =
 
   result = site
 
-proc getWeeks*(group: Group): Future[seq[SelectOption]] {.async.} =
+proc getWeeks*(group: Group): Future[seq[SelectOption]] {.async, gcsafe.} =
   # Получение доступных недель для группы
   var client = newAsyncHttpClient(sslContext=newContext(verifyMode=CVerifyNone))
   client.headers = newHttpHeaders({ "Content-Type": "application/x-www-form-urlencoded", "X-CSRF-Token": group.site.csrfToken.get, "Cookie": group.site.cookies.toFullString() })
