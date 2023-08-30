@@ -32,7 +32,7 @@ proc parseTeachers*(rawString: string): seq[string] =
     if str notin INVALID_TEACHERS: result.add(str)
 
 proc parseClassrooms*(rawString: string): seq[string] =
-  if rawString.len == "Ауд. ".len: return @[] # актуально для занятий по физкультуре, по другим не видел
+  if rawString == "Ауд. " or rawString.len == 0: return @[] # актуально для занятий по физкультуре, по другим не видел
   for aud in rawString.split("Ауд. "):
     if aud.len != 0: result.add(aud)
 
