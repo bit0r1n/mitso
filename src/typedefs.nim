@@ -40,7 +40,7 @@ type
     lessonTime*: LessonTime
     lType*: LessonType
     classrooms*: seq[string]
-  ScheldueDay* = ref object
+  ScheduleDay* = ref object
     date*: DateTime
     displayDate*: string
     day*: WeekDay

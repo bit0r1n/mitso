@@ -29,7 +29,7 @@ proc loadPage*(site: Site): Future[string] {.async.} =
   # Получение и сохранение контента сайта
   var client = newHttpClient(sslContext=newContext(verifyMode=CVerifyNone))
   debug "[loadPage]", "Получение контента базовой страницы"
-  let response = client.requestWithRetry(SCHELDUE_BASE)
+  let response = client.requestWithRetry(SCHEDULE_BASE)
   debug "[loadPage]", "Контент получен, сохранение"
   site.content = some response.body
 
@@ -73,7 +73,7 @@ proc threadParseCourse(site: Site, facult: SelectOption, form: SelectOption, cou
   client.headers = newHttpHeaders({ "Content-Type": "application/x-www-form-urlencoded", "X-CSRF-Token": site.csrfToken.get, "Cookie": site.cookies.toFullString() })
   debug "[threadParseCourse]", fmt"Получение групп ({$course}, {$facult}, {$form})"
   let
-    groupsRawJson = client.requestWithRetry(parseUri(SCHELDUE_GROUP), HttpPost,
+    groupsRawJson = client.requestWithRetry(parseUri(SCHEDULE_GROUP), HttpPost,
       body = encodeQuery({
       "depdrop_parents[0]": facult.id,
       "depdrop_parents[1]": form.id,
@@ -101,7 +101,7 @@ proc threadParseForm(site: Site, facult: SelectOption, form: SelectOption): seq[
   client.headers = newHttpHeaders({ "Content-Type": "application/x-www-form-urlencoded", "X-CSRF-Token": site.csrfToken.get, "Cookie": site.cookies.toFullString() })
   debug "[threadParseForm]", fmt"Получение курсов для факультета {$facult} ({$form})"
   var
-    coursesRawJson = client.requestWithRetry(parseUri(SCHELDUE_COURSE), HttpPost,
+    coursesRawJson = client.requestWithRetry(parseUri(SCHEDULE_COURSE), HttpPost,
       body = encodeQuery({
       "depdrop_parents[0]": facult.id,
       "depdrop_parents[1]": form.id,
@@ -131,7 +131,7 @@ proc threadParseFaculty(site: Site, facult: SelectOption): seq[Group] =
   client.headers = newHttpHeaders({ "Content-Type": "application/x-www-form-urlencoded", "X-CSRF-Token": site.csrfToken.get, "Cookie": site.cookies.toFullString() })
   debug "[threadParseFaculty]", "Получение форм обучения для факультета", $facult
   var
-    formsRawJson = client.requestWithRetry(parseUri(SCHELDUE_FORMS), HttpPost,
+    formsRawJson = client.requestWithRetry(parseUri(SCHEDULE_FORMS), HttpPost,
       body = encodeQuery({ "depdrop_parents[0]": facult.id, "depdrop_all_params[faculty-id]": facult.id }))
     formsJson = parseJson(formsRawJson.body)
     forms = newSeq[SelectOption]()
@@ -210,7 +210,7 @@ proc getWeeks*(group: Group): Future[seq[SelectOption]] {.async.} =
   client.headers = newHttpHeaders({ "Content-Type": "application/x-www-form-urlencoded", "X-CSRF-Token": group.site.csrfToken.get, "Cookie": group.site.cookies.toFullString() })
   debug "[getWeeks]", "Получение доступных недель для группы", $group
   let
-    weeksRawJson = await client.requestWithRetry(parseUri(SCHELDUE_WEEK), HttpPost,
+    weeksRawJson = await client.requestWithRetry(parseUri(SCHEDULE_WEEK), HttpPost,
       body = encodeQuery({
       "depdrop_parents[0]": %group.faculty,
       "depdrop_parents[1]": %group.form,
@@ -239,13 +239,13 @@ proc getWeeks*(group: Group): Future[seq[SelectOption]] {.async.} =
 
   return group.weeks
 
-proc getScheldue*(group: Group, week: SelectOption): Future[seq[ScheldueDay]] {.async.} =
+proc getSchedule*(group: Group, week: SelectOption): Future[seq[ScheduleDay]] {.async.} =
   # Получение расписания на неделю
   var client = newAsyncHttpClient(sslContext=newContext(verifyMode=CVerifyNone))
   client.headers = newHttpHeaders({ "Content-Type": "application/x-www-form-urlencoded", "X-CSRF-Token": group.site.csrfToken.get, "Cookie": group.site.cookies.toFullString() })
-  debug "[getScheldue]", fmt"Получение расписания для группы {$group} для {$week}"
+  debug "[getSchedule]", fmt"Получение расписания для группы {$group} для {$week}"
   let
-    sheldueRawHtml = await client.requestWithRetry(SCHELDUE_BASE, HttpPost,
+    sheldueRawHtml = await client.requestWithRetry(SCHEDULE_BASE, HttpPost,
       body = encodeQuery({
         "ScheduleSearch[fak]": %group.faculty,
         "ScheduleSearch[form]": %group.form,
@@ -254,28 +254,28 @@ proc getScheldue*(group: Group, week: SelectOption): Future[seq[ScheldueDay]] {.
         "ScheduleSearch[week]": week.id,
       }))
     resp = await sheldueRawHtml.body()
-    scheldueHtml = parseHtml(resp)
-  var days = newSeq[ScheldueDay]()
+    scheduleHtml = parseHtml(resp)
+  var days = newSeq[ScheduleDay]()
 
-  for el in scheldueHtml.findAll("div"):
+  for el in scheduleHtml.findAll("div"):
     if el.attr("class") != "container" and el.child("table") != nil: continue
 
     var lessons = newSeq[Lesson]()
-    var day: ScheldueDay
+    var day: ScheduleDay
     var eI = 0
     for item in el.items:
       if item.kind == xnElement:
         if item.tag == "h2":
           eI += 1
 
-          day = ScheldueDay()
+          day = ScheduleDay()
           day.displayDate = item.innerText
           day.day = parseDay(eI - 1)
           let
-            scheldueDayMonth = parseMonth(item.innerText().split(" ")[1])
+            scheduleDayMonth = parseMonth(item.innerText().split(" ")[1])
             dayTime = dateTime(
-              now().year + (if scheldueDayMonth == mJan and now().month == mDec: 1 else: 0),
-              scheldueDayMonth,
+              now().year + (if scheduleDayMonth == mJan and now().month == mDec: 1 else: 0),
+              scheduleDayMonth,
               parseInt(item.innerText().split(" ")[0]),
               3, 0, 0
             )

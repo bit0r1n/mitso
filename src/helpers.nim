@@ -16,8 +16,9 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 ]#
 
-import strutils, strformat, times, options, nre, httpclient, uri, asyncdispatch
-import typedefs, private/constants
+import strutils, strformat, times, options, nre
+import typedefs
+import private/constants
 
 proc parseTeachers*(rawString: string): seq[string] =
   let strings = rawString.split("\n")
@@ -356,14 +357,3 @@ proc newLesson*(name: string,
     lType: lType,
     classrooms: classrooms
   )
-
-proc requestWithRetry*(client: HttpClient | AsyncHttpClient; url: Uri | string;
-             httpMethod: HttpMethod | string = HttpGet; body = "";
-             headers: HttpHeaders = nil; multipart: MultipartData = nil): Future[Response | AsyncResponse] {.multisync.} =
-  try:
-    result = await client.request(url, httpMethod, body, headers, multipart)
-  except:
-    result = await client.requestWithRetry(url, httpMethod, body, headers, multipart)
-
-converter toFullString*(values: HttpHeaderValues): string =
-  return seq[string](values).join("; ")
