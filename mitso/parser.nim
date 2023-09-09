@@ -57,7 +57,6 @@ proc getFaculties*(site: Site): seq[SelectOption] =
   # Получение и сохранение факультетов
   debug "[getFaculties]", "Парс главной страницы"
   let html = parseHtml(site.content.get)
-  result = @[]
   site.faculties.setLen(0)
   for select in html.findAll("select"):
     if select.attrs.hasKey("id") and select.attrs["id"] == "faculty-id":
@@ -256,7 +255,6 @@ proc getSchedule*(group: Group, week: string): Future[seq[ScheduleDay]] {.async.
       }))
     resp = await sheldueRawHtml.body()
     scheduleHtml = parseHtml(resp)
-  var days = newSeq[ScheduleDay]()
 
   for el in scheduleHtml.findAll("div"):
     if el.attr("class") != "container" and el.child("table") != nil: continue
@@ -309,11 +307,10 @@ proc getSchedule*(group: Group, week: string): Future[seq[ScheduleDay]] {.async.
               var lessonDate = day.date
               lessonDate += initDuration(hours = ($%lesson.lessonTime).hours, minutes = ($%lesson.lessonTime).minutes)
 
+              lesson.date = lessonDate
+
               day.lessons.add(lesson)
-          if day.lessons.len > 0: days.add(day)
-
-
-  return days
+          if day.lessons.len > 0: result.add(day)
 
 proc getSchedule*(group: Group, week: SelectOption): Future[seq[ScheduleDay]] {.async.} =
   result = await group.getSchedule(week.id)
