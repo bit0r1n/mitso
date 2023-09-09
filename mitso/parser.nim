@@ -276,7 +276,7 @@ proc getSchedule*(group: Group, week: string): Future[seq[ScheduleDay]] {.async.
               now().year + (if scheduleDayMonth == mJan and now().month == mDec: 1 else: 0),
               scheduleDayMonth,
               parseInt(item.innerText().split(" ")[0]),
-              3, 0, 0, zone = utc()
+              zone = utc()
             )
           day.date = dayTime
           lessons.setLen(0)
