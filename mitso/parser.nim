@@ -313,7 +313,7 @@ proc getSchedule*(group: Group, week: string): Future[seq[
 
             var
               ls = parseLessonName(tds[1].innerText.replace("\n", " "))
-              time = parseTime(tds[0].innerText)
+              time = LessonTime(i - 1)
 
             if day.lessons.len != 0 and ls.lessonName == day.lessons[
                 ^1].name and ls.lessonType == day.lessons[^1].lType and time ==
@@ -326,7 +326,7 @@ proc getSchedule*(group: Group, week: string): Future[seq[
               if ls.teacher notin INVALID_TEACHERS: lesson.teachers.add(ls.teacher)
               if tds[2].innerText().len > 0: lesson.classrooms.add(
                   parseClassrooms(tds[2].innerText))
-              lesson.lessonTime = parseTime(tds[0].innerText)
+              lesson.lessonTime = time
 
               var lessonDate = day.date
               lessonDate += initDuration(hours = ($%lesson.lessonTime).hours -
