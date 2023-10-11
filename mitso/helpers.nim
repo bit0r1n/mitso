@@ -94,6 +94,8 @@ proc parseTime*(time: string): LessonTime =
     return ltSeventh
   of "19.25 - 20.45":
     return ltEighth
+  else:
+    raise newException(ValueError, "Invalid time")
 
 proc parseDay*(day: string): WeekDay =
   case day:
