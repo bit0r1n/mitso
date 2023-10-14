@@ -26,19 +26,18 @@ import std/[
 import private/[utils, constants], typedefs, helpers
 
 proc loadPage*(site: Site): Future[string] {.async.} =
-  # Получение и сохранение контента сайта
+  ## Получение и сохранение контента сайта
   var client = newHttpClient(sslContext = newContext(verifyMode = CVerifyNone))
+
   debug "[loadPage]", "Получение контента базовой страницы"
   let response = client.requestWithRetry(SCHEDULE_BASE)
+
   debug "[loadPage]", "Контент получен, сохранение"
   site.content = some response.body
 
-  # get cookies from headers and save them
   debug "[loadPage]", "Получение куков"
   site.cookies = response.headers["Set-Cookie"]
 
-
-  # get csrf token from meta tag (name = csrf-token, content = token)
   let
     doc = parseHtml(site.content.get)
     meta = doc.findAll("meta")
@@ -54,11 +53,11 @@ proc loadPage*(site: Site): Future[string] {.async.} =
   return site.content.get
 
 proc getFaculties*(site: Site): seq[SelectOption] =
-  # Получение и сохранение факультетов
+  ## Получение и сохранение факультетов
   debug "[getFaculties]", "Парс главной страницы"
   let html = parseHtml(site.content.get)
   site.faculties.setLen(0)
-  for select in html.findAll("select"):
+  for select in html.findAll("select"): # проход по пунктам селекта, они доступны при загрузке страницы
     if select.attrs.hasKey("id") and select.attrs["id"] == "faculty-id":
       for x in select.items:
         if x.kind == xnElement and x.attr("value") != "":
@@ -157,8 +156,8 @@ proc threadParseFaculty(site: Site, facult: string): seq[Group] =
       result.add(group)
 
 proc getGroups*(site: Site,
-  form: seq[Form] = @[], course: seq[Course] = @[], faculty: seq[Faculty] = @[]): Future[
-      seq[Group]] {.async.} =
+  form: seq[Form] = @[], course: seq[Course] = @[], faculty: seq[Faculty] = @[
+      ]): Future[seq[Group]] {.async.} =
   # Получение, фильтрация и сохранение групп (перезаписывает ранее сохраненные группы)
 
   # Очистка списка групп
@@ -203,6 +202,7 @@ proc getGroups*(site: Site,
   return site.groups
 
 proc loadGroups*(site: Site): Future[Site] {.async.} =
+  ## Хелпер, загружающий все данные с нуля
   debug "[loadGroups]", "Загрузка страницы"
   discard await site.loadPage()
   debug "[loadGroups]", "Парс факультетов"
@@ -213,7 +213,7 @@ proc loadGroups*(site: Site): Future[Site] {.async.} =
   result = site
 
 proc getWeeks*(group: Group): Future[seq[SelectOption]] {.async, gcsafe.} =
-  # Получение доступных недель для группы
+  ## Получение доступных недель для группы
   var client = newAsyncHttpClient(sslContext = newContext(
       verifyMode = CVerifyNone))
   client.headers = newHttpHeaders({"Content-Type": "application/x-www-form-urlencoded",
@@ -279,58 +279,64 @@ proc getSchedule*(group: Group, week: string): Future[seq[
 
     var lessons = newSeq[Lesson]()
     var day: ScheduleDay
-    var eI = 0
+    var eI = -1 # индекс блока дня
     for item in el.items:
       if item.kind == xnElement:
-        if item.tag == "h2":
+        if item.tag == "h2": # блок дня начинается с заголовка - даты
           eI += 1
 
           day = ScheduleDay()
           day.displayDate = item.innerText
-          day.day = parseDay(eI - 1)
+          day.day = parseDay(eI)
           let
-            scheduleDayMonth = parseMonth(item.innerText().split(" ")[1])
+            scheduleDayMonth = parseMonth(item.innerText.split(" ")[1])
             dayTime = dateTime(
               now().year + (if scheduleDayMonth == mJan and now().month ==
                   mDec: 1 else: 0),
               scheduleDayMonth,
-              parseInt(item.innerText().split(" ")[0]),
+              parseInt(item.innerText.split(" ")[0]),
               zone = utc()
             )
           day.date = dayTime
           lessons.setLen(0)
-        elif item.tag == "table":
+        elif item.tag == "table": # таблица занятий
           let trs = item.findAll("tr").filter do (x: XmlNode) -> bool: x.kind == xnElement
-          for i, trDay in trs:
+          for i, trDay in trs: # проход по строкам занятий
             if trDay.kind != xnElement: continue
-            if i == 0: continue
+            if i == 0: continue # игнор из thead
             var lesson = Lesson()
             let tds = trDay.findAll("td").filter do (x: XmlNode) ->
                 bool: x.kind == xnElement
             if tds[1].innerText.contains("(нет занятий)") or tds[
                 1].innerText.replace("\n", " ").match(
-                re"^\d\. -$").isSome: continue
+                re"^\d\. -$").isSome: continue # игнор лаб/прак для одной части
 
             var
               ls = parseLessonName(tds[1].innerText.replace("\n", " "))
+              classrooms = if tds[2].innerText.len > 0: parseClassrooms(tds[
+                  2].innerText) else: @[]
               time: LessonTime
-              
+
             try:
-              time = parseTime(tds[0].innerText)
+              time = parseTime(tds[0].innerText) # =))
             except ValueError:
               continue
 
             if day.lessons.len != 0 and ls.lessonName == day.lessons[
-                ^1].name and ls.lessonType == day.lessons[^1].lType and time ==
-                day.lessons[^1].lessonTime:
-              day.lessons[^1].classrooms.add(parseClassrooms(tds[2].innerText))
-              day.lessons[^1].teachers.add(ls.teacher)
+                ^1].name and
+              ls.lessonType == day.lessons[^1].lType and time == day.lessons[
+                  ^1].lessonTime: # занятие разделено на группы
+              for classroom in classrooms:
+                if not day.lessons[^1].classrooms.contains(classroom):
+                  day.lessons[^1].classrooms.add(classroom)
+              if not day.lessons[^1].teachers.contains(ls.teacher):
+                day.lessons[^1].teachers.add(ls.teacher)
             else:
               lesson.name = ls.lessonName
               lesson.lType = ls.lessonType
               if ls.teacher notin INVALID_TEACHERS: lesson.teachers.add(ls.teacher)
-              if tds[2].innerText().len > 0: lesson.classrooms.add(
-                  parseClassrooms(tds[2].innerText))
+              if classrooms.len > 0: lesson.classrooms.add(
+                  classrooms)
               lesson.lessonTime = time
 
               var lessonDate = day.date
