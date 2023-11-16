@@ -135,7 +135,7 @@ proc parseDay*(dayOfWeek: int): WeekDay =
 
 proc parseLessonType*(lType: string): LessonType =
   case lType:
-  of "лек":
+  of "лек", "нач":
     return ltpLecture
   of "лаб":
     return ltpLaboratory
