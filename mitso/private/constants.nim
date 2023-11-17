@@ -22,5 +22,5 @@ const SCHEDULE_COURSE* = SCHEDULE_BASE & "/course"
 const SCHEDULE_GROUP* = SCHEDULE_BASE & "/group"
 const SCHEDULE_WEEK* = SCHEDULE_BASE & "/week"
 const INVALID_GROUP_ID* = "Auditoriya" # ???
-const INVALID_TEACHERS* = @[ "Преподаватель 0. 0.", "Преподаватель к." ] # =((
+const INVALID_TEACHERS* = @[ "Преподаватель 0. 0.", "Преподаватель к.", "_Вакансия" ] # =((
 const LESSON_DURATION* = (1_000 * 60) * 80
