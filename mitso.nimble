@@ -1,6 +1,6 @@
 # Package
 
-version       = "0.1.9"
+version       = "0.1.10"
 author        = "bit0r1n"
 description   = "арбузный парс расписания митсо (минск btw)"
 license       = "GPL-3.0-or-later"
