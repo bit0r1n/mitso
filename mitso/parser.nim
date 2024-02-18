@@ -327,9 +327,9 @@ proc getSchedule*(group: Group, week: string): Future[seq[
               ls.lessonType == day.lessons[^1].lType and time == day.lessons[
                   ^1].lessonTime: # занятие разделено на группы
               for classroom in classrooms:
-                if not day.lessons[^1].classrooms.contains(classroom):
+                if classroom notin day.lessons[^1].classrooms:
                   day.lessons[^1].classrooms.add(classroom)
-              if not day.lessons[^1].teachers.contains(ls.teacher):
+              if ls.teacher notin INVALID_TEACHERS and ls.teacher notin day.lessons[^1].teachers:
                 day.lessons[^1].teachers.add(ls.teacher)
             else:
               lesson.name = ls.lessonName
