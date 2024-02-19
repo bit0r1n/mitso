@@ -329,12 +329,12 @@ proc `%`*(faculty: Faculty): string =
   of faLegal:
     return "YUridicheskij"
 
-proc newSite*(): Site =
+proc newScheduleSite*(): ScheduleSite =
   new(result)
   result.faculties = newSeq[SelectOption]()
   result.groups = newSeq[Group]()
 
-proc newGroup*(site: Site, id, display: string,
+proc newGroup*(site: ScheduleSite, id, display: string,
   course: Course, form: Form, faculty: Faculty,
   weeks: Option[seq[SelectOption]]): Group =
   result = Group(
@@ -359,3 +359,7 @@ proc newLesson*(name: string,
     lType: lType,
     classrooms: classrooms
   )
+
+proc newAccount*(): Account =
+  new(result)
+  result.fetched = false

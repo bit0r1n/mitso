@@ -25,7 +25,7 @@ import std/[
 ]
 import private/[utils, constants], typedefs, helpers
 
-proc loadPage*(site: Site): Future[string] {.async.} =
+proc loadPage*(site: ScheduleSite): Future[string] {.async.} =
   ## Получение и сохранение контента сайта
   var client = newHttpClient(sslContext = newContext(verifyMode = CVerifyNone))
 
@@ -52,7 +52,7 @@ proc loadPage*(site: Site): Future[string] {.async.} =
 
   return site.content.get
 
-proc getFaculties*(site: Site): seq[SelectOption] =
+proc getFaculties*(site: ScheduleSite): seq[SelectOption] =
   ## Получение и сохранение факультетов
   debug "[getFaculties]", "Парс главной страницы"
   let html = parseHtml(site.content.get)
@@ -66,7 +66,7 @@ proc getFaculties*(site: Site): seq[SelectOption] =
           result.add(facult)
           site.faculties.add(facult)
 
-proc threadParseCourse(site: Site, facult: string, form: string,
+proc threadParseCourse(site: ScheduleSite, facult: string, form: string,
     course: string): seq[Group] =
   var client = newHttpClient(sslContext = newContext(verifyMode = CVerifyNone))
   client.headers = newHttpHeaders({"Content-Type": "application/x-www-form-urlencoded",
@@ -96,7 +96,7 @@ proc threadParseCourse(site: Site, facult: string, form: string,
     debug "[threadParseCourse]", "Найдена группа", $group
     result.add(group)
 
-proc threadParseForm(site: Site, facult: string, form: string): seq[Group] =
+proc threadParseForm(site: ScheduleSite, facult: string, form: string): seq[Group] =
   var client = newHttpClient(sslContext = newContext(verifyMode = CVerifyNone))
   client.headers = newHttpHeaders({"Content-Type": "application/x-www-form-urlencoded",
       "X-CSRF-Token": site.csrfToken.get, "Cookie": site.cookies.toFullString()})
@@ -128,7 +128,7 @@ proc threadParseForm(site: Site, facult: string, form: string): seq[Group] =
     for group in groups:
       result.add(group)
 
-proc threadParseFaculty(site: Site, facult: string): seq[Group] =
+proc threadParseFaculty(site: ScheduleSite, facult: string): seq[Group] =
   var client = newHttpClient(sslContext = newContext(verifyMode = CVerifyNone))
   client.headers = newHttpHeaders({"Content-Type": "application/x-www-form-urlencoded",
       "X-CSRF-Token": site.csrfToken.get, "Cookie": site.cookies.toFullString()})
@@ -155,7 +155,7 @@ proc threadParseFaculty(site: Site, facult: string): seq[Group] =
     for group in groups:
       result.add(group)
 
-proc getGroups*(site: Site,
+proc getGroups*(site: ScheduleSite,
   form: seq[Form] = @[], course: seq[Course] = @[], faculty: seq[Faculty] = @[
       ]): Future[seq[Group]] {.async.} =
   # Получение, фильтрация и сохранение групп (перезаписывает ранее сохраненные группы)
@@ -201,7 +201,7 @@ proc getGroups*(site: Site,
       return simGroups[^1] == x
   return site.groups
 
-proc loadGroups*(site: Site): Future[Site] {.async.} =
+proc loadGroups*(site: ScheduleSite): Future[ScheduleSite] {.async.} =
   ## Хелпер, загружающий все данные с нуля
   debug "[loadGroups]", "Загрузка страницы"
   discard await site.loadPage()
