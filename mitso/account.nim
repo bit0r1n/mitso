@@ -54,15 +54,13 @@ proc login*(account: Account, login, password: string) {.async.} =
   for i, el in doc.findAll("td"):
     if i mod 2 != 1: continue
 
-    let value = parseFloat(el.innerText)
-
     case i:
     of 1:
-      account.balance = some value
+      account.balance = some parseFloat(el.innerText)
     of 3:
-      account.debt = some value
+      account.debt = some parseFloat(el.innerText)
     of 5:
-      account.penalty = some value
+      account.penalty = some parseFloat(el.innerText)
     else: discard
 
   account.fetched = true
