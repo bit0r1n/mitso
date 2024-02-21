@@ -18,13 +18,13 @@
 
 import std/[
   asyncdispatch, httpclient, net,
-  strformat, options, htmlparser,
-  xmltree, strutils
+  strformat, htmlparser, xmltree,
+  strutils
 ]
 
 import private/constants, typedefs
 
-proc isLoggedIn(content: XmlNode): bool =
+proc isLoggedIn(content: var XmlNode): bool =
   let inputs = content.findAll("input")
   if inputs.len != 0: return false
 
@@ -33,22 +33,28 @@ proc isLoggedIn(content: XmlNode): bool =
 
   return true
 
-proc login*(account: Account, login, password: string) {.async.} =
+proc fetchAccount*(login, password: string): Future[Account] {.async.} =
   ## Авторизация в аккаунт, при успешном входе данные будут сохранены в объект
-  var client = newAsyncHttpClient(sslContext = newContext(verifyMode = CVerifyNone))
-
-  let
+  var
+    ctx = newContext(verifyMode = CVerifyNone)
+    client = newAsyncHttpClient(sslContext = ctx)
+    headers = newHttpHeaders({ "Content-Type": "application/x-www-form-urlencoded" })
     response = await client.request(
       ACCOUNT_LOGIN, HttpPost, &"login={login}&password={password}",
-      newHttpHeaders({ "Content-Type": "application/x-www-form-urlencoded" }))
+      headers = headers)
     accountBody = await response.body
     doc = parseHtml(accountBody)
 
+  ctx.destroyContext()
+  headers.clear()
+
   if not isLoggedIn(doc): raise newException(AccountFailedLoginError, "Invalid account credentials")
+
+  new(result)
 
   for el in doc.findAll("div"):
     if el.attr("class") == "topmenu":
-      account.fullName = some el.innerText.strip
+      result.fullName = el.innerText.strip
       break
 
   for i, el in doc.findAll("td"):
@@ -56,11 +62,11 @@ proc login*(account: Account, login, password: string) {.async.} =
 
     case i:
     of 1:
-      account.balance = some parseFloat(el.innerText)
+      result.balance = parseFloat(el.innerText)
     of 3:
-      account.debt = some parseFloat(el.innerText)
+      result.debt = parseFloat(el.innerText)
     of 5:
-      account.penalty = some parseFloat(el.innerText)
+      result.penalty = parseFloat(el.innerText)
     else: discard
 
-  account.fetched = true
+  doc.clear()

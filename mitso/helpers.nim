@@ -298,6 +298,12 @@ proc `$`*(day: WeekDay): string =
   of dSun:
     return "Воскресенье"
 
+proc `$`*(account: Account): string =
+  result = &"{account.fullName}, {account.balance}"
+
+proc `$`*(select: SelectOption): string =
+  result = &"{select.display} [{select.id}]"
+
 proc `%`*(form: Form): string =
   case form:
   of foFullTime:
@@ -359,7 +365,3 @@ proc newLesson*(name: string,
     lType: lType,
     classrooms: classrooms
   )
-
-proc newAccount*(): Account =
-  new(result)
-  result.fetched = false

@@ -34,21 +34,18 @@ waitFor main()
 ### Получение баланса студента (модуль `account`)
 
 ```nim
-import asyncdispatch, options
-import mitso/[account, helpers, typedefs]
+import asyncdispatch
+import mitso/[account, typedefs]
 
 proc main() {.async.} =
   echo "Введи номер счета"
-
-  let
-    account = newAccount()
-    input = readLine(stdin)
+  let input = readLine(stdin)
 
   try:
-    await account.login(input, input)
+    let account = await fetchAccount(input, input)
 
-    echo account.fullName.get
-    echo "Баланс: " & $account.balance.get
+    echo account.fullName
+    echo "Баланс: ", account.balance
 
   except AccountFailedLoginError:
     echo "Не удалось войти в аккаунт"

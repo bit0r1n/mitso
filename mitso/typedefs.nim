@@ -26,11 +26,10 @@ type
     faculties*: seq[SelectOption]
     groups*: seq[Group]
   Account* = ref object
-    fetched*: bool
-    fullName*: Option[string]
-    balance*: Option[float]
-    debt*: Option[float]
-    penalty*: Option[float]
+    fullName*: string
+    balance*: float
+    debt*: float
+    penalty*: float
   AccountFailedLoginError* = object of CatchableError
   Group* = ref object
     site*: ScheduleSite
