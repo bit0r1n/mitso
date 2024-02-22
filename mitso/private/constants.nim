@@ -24,3 +24,5 @@ const SCHEDULE_WEEK* = SCHEDULE_BASE & "/week"
 const INVALID_GROUP_ID* = "Auditoriya" # ???
 const INVALID_TEACHERS* = @[ "Преподаватель 0. 0.", "Преподаватель к.", "_Вакансия" ] # =((
 const LESSON_DURATION* = (1_000 * 60) * 80
+
+const ACCOUNT_LOGIN* = "https://student.mitso.by/login_stud.php"

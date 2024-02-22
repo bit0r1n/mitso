@@ -19,14 +19,20 @@
 import options, times, httpcore
 
 type
-  Site* = ref object
+  ScheduleSite* = ref object
     csrfToken*: Option[string]
     cookies*: HttpHeaderValues
     content*: Option[string]
     faculties*: seq[SelectOption]
     groups*: seq[Group]
+  Account* = ref object
+    fullName*: string
+    balance*: float
+    debt*: float
+    penalty*: float
+  AccountFailedLoginError* = object of CatchableError
   Group* = ref object
-    site*: Site
+    site*: ScheduleSite
     id*: string
     display*: string
     course*: Course

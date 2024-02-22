@@ -298,6 +298,12 @@ proc `$`*(day: WeekDay): string =
   of dSun:
     return "Воскресенье"
 
+proc `$`*(account: Account): string =
+  result = &"{account.fullName}, {account.balance}"
+
+proc `$`*(select: SelectOption): string =
+  result = &"{select.display} [{select.id}]"
+
 proc `%`*(form: Form): string =
   case form:
   of foFullTime:
@@ -329,12 +335,12 @@ proc `%`*(faculty: Faculty): string =
   of faLegal:
     return "YUridicheskij"
 
-proc newSite*(): Site =
+proc newScheduleSite*(): ScheduleSite =
   new(result)
   result.faculties = newSeq[SelectOption]()
   result.groups = newSeq[Group]()
 
-proc newGroup*(site: Site, id, display: string,
+proc newGroup*(site: ScheduleSite, id, display: string,
   course: Course, form: Form, faculty: Faculty,
   weeks: Option[seq[SelectOption]]): Group =
   result = Group(

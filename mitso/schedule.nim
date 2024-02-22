@@ -25,37 +25,42 @@ import std/[
 ]
 import private/[utils, constants], typedefs, helpers
 
-proc loadPage*(site: Site): Future[string] {.async.} =
+proc loadPage*(site: ScheduleSite): Future[string] {.async.} =
   ## Получение и сохранение контента сайта
-  var client = newHttpClient(sslContext = newContext(verifyMode = CVerifyNone))
+  var
+    ctx = newContext(verifyMode = CVerifyNone)
+    client = newAsyncHttpClient(sslContext = ctx)
 
   debug "[loadPage]", "Получение контента базовой страницы"
-  let response = client.requestWithRetry(SCHEDULE_BASE)
+  let response = await client.requestWithRetry(SCHEDULE_BASE)
+
+  ctx.destroyContext()
 
   debug "[loadPage]", "Контент получен, сохранение"
-  site.content = some response.body
+  site.content = some await response.body
 
   debug "[loadPage]", "Получение куков"
   site.cookies = response.headers["Set-Cookie"]
 
-  let
+  var
     doc = parseHtml(site.content.get)
-    meta = doc.findAll("meta")
-  for m in meta:
+  for m in doc.findAll("meta"):
     if m.attrs.hasKey("name") and m.attrs["name"] == "csrf-token":
       debug "[loadPage]", "CSRF токен получен"
       site.csrfToken = some m.attrs["content"]
       break
+
+  doc.clear()
 
   if site.csrfToken.isNone:
     raise newException(ValueError, "CSRF token not found")
 
   return site.content.get
 
-proc getFaculties*(site: Site): seq[SelectOption] =
+proc getFaculties*(site: ScheduleSite): seq[SelectOption] =
   ## Получение и сохранение факультетов
   debug "[getFaculties]", "Парс главной страницы"
-  let html = parseHtml(site.content.get)
+  var html = parseHtml(site.content.get)
   site.faculties.setLen(0)
   for select in html.findAll("select"): # проход по пунктам селекта, они доступны при загрузке страницы
     if select.attrs.hasKey("id") and select.attrs["id"] == "faculty-id":
@@ -65,12 +70,20 @@ proc getFaculties*(site: Site): seq[SelectOption] =
           debug "[getFaculties]", "Найден факультет", $facult
           result.add(facult)
           site.faculties.add(facult)
+  html.clear()
 
-proc threadParseCourse(site: Site, facult: string, form: string,
+proc threadParseCourse(site: ScheduleSite, facult: string, form: string,
     course: string): seq[Group] =
-  var client = newHttpClient(sslContext = newContext(verifyMode = CVerifyNone))
-  client.headers = newHttpHeaders({"Content-Type": "application/x-www-form-urlencoded",
-      "X-CSRF-Token": site.csrfToken.get, "Cookie": site.cookies.toFullString()})
+  var
+    ctx = newContext(verifyMode = CVerifyNone)
+    client = newHttpClient(sslContext = ctx)
+    headers = newHttpHeaders({
+      "Content-Type": "application/x-www-form-urlencoded",
+      "X-CSRF-Token": site.csrfToken.get,
+      "Cookie": site.cookies.toFullString()
+    })
+  client.headers = headers
+
   debug "[threadParseCourse]", fmt"Получение групп ({$course}, {$facult}, {$form})"
   let
     groupsRawJson = client.requestWithRetry(parseUri(SCHEDULE_GROUP), HttpPost,
@@ -84,6 +97,9 @@ proc threadParseCourse(site: Site, facult: string, form: string,
     }))
     groupsJson = parseJson(groupsRawJson.body)
 
+  ctx.destroyContext()
+  headers.clear()
+
   for groupElem in groupsJson["output"]:
     let group = Group(
       site: site,
@@ -96,10 +112,17 @@ proc threadParseCourse(site: Site, facult: string, form: string,
     debug "[threadParseCourse]", "Найдена группа", $group
     result.add(group)
 
-proc threadParseForm(site: Site, facult: string, form: string): seq[Group] =
-  var client = newHttpClient(sslContext = newContext(verifyMode = CVerifyNone))
-  client.headers = newHttpHeaders({"Content-Type": "application/x-www-form-urlencoded",
-      "X-CSRF-Token": site.csrfToken.get, "Cookie": site.cookies.toFullString()})
+proc threadParseForm(site: ScheduleSite, facult: string, form: string): seq[Group] =
+  var
+    ctx = newContext(verifyMode = CVerifyNone)
+    client = newHttpClient(sslContext = ctx)
+    headers = newHttpHeaders({
+      "Content-Type": "application/x-www-form-urlencoded",
+      "X-CSRF-Token": site.csrfToken.get,
+      "Cookie": site.cookies.toFullString()
+    })
+  client.headers = headers
+
   debug "[threadParseForm]", fmt"Получение курсов для факультета {$facult} ({$form})"
   var
     coursesRawJson = client.requestWithRetry(parseUri(SCHEDULE_COURSE),
@@ -113,6 +136,9 @@ proc threadParseForm(site: Site, facult: string, form: string): seq[Group] =
     coursesJson = parseJson(coursesRawJson.body)
     courses = newSeq[SelectOption]()
 
+  ctx.destroyContext()
+  headers.clear()
+
   # Парс курсов формы обучения
   for course in coursesJson["output"].getElems():
     courses.add((id: course["id"].getStr, display: course["name"].getStr))
@@ -123,22 +149,36 @@ proc threadParseForm(site: Site, facult: string, form: string): seq[Group] =
     let groupsCourse = spawn threadParseCourse(site, facult, form, course.id)
     groupsResponses.add(groupsCourse)
 
+  courses.setLen(0)
+
   for response in groupsResponses:
     let groups = ^response
     for group in groups:
       result.add(group)
 
-proc threadParseFaculty(site: Site, facult: string): seq[Group] =
-  var client = newHttpClient(sslContext = newContext(verifyMode = CVerifyNone))
-  client.headers = newHttpHeaders({"Content-Type": "application/x-www-form-urlencoded",
-      "X-CSRF-Token": site.csrfToken.get, "Cookie": site.cookies.toFullString()})
+  groupsResponses.setLen(0)
+
+proc threadParseFaculty(site: ScheduleSite, facult: string): seq[Group] =
+  var
+    ctx = newContext(verifyMode = CVerifyNone)
+    client = newHttpClient(sslContext = ctx)
+    headers = newHttpHeaders({
+      "Content-Type": "application/x-www-form-urlencoded",
+      "X-CSRF-Token": site.csrfToken.get,
+      "Cookie": site.cookies.toFullString()
+    })
+  client.headers = headers
+
   debug "[threadParseFaculty]", "Получение форм обучения для факультета", $facult
   var
     formsRawJson = client.requestWithRetry(parseUri(SCHEDULE_FORMS), HttpPost,
-      body = encodeQuery({"depdrop_parents[0]": facult,
-          "depdrop_all_params[faculty-id]": facult}))
+      body = encodeQuery({ "depdrop_parents[0]": facult,
+          "depdrop_all_params[faculty-id]": facult }))
     formsJson = parseJson(formsRawJson.body)
     forms = newSeq[SelectOption]()
+
+  ctx.destroyContext()
+  headers.clear()
 
   # Парс форм обучения
   for form in formsJson["output"].getElems():
@@ -150,12 +190,15 @@ proc threadParseFaculty(site: Site, facult: string): seq[Group] =
   var formsResponses = newSeq[FlowVar[seq[Group]]]()
   for form in forms.items:
     formsResponses.add(spawn threadParseForm(site, facult, form.id))
+
+  forms.setLen(0)
+  
   for response in formsResponses:
     let groups = ^response
     for group in groups:
       result.add(group)
 
-proc getGroups*(site: Site,
+proc getGroups*(site: ScheduleSite,
   form: seq[Form] = @[], course: seq[Course] = @[], faculty: seq[Faculty] = @[
       ]): Future[seq[Group]] {.async.} =
   # Получение, фильтрация и сохранение групп (перезаписывает ранее сохраненные группы)
@@ -173,6 +216,8 @@ proc getGroups*(site: Site,
     let res = ^groupsChunk
     for group in res:
       site.groups.add(group)
+
+  facultiesResponses.setLen(0)
 
   # Сортировка групп по курсам/номерам
   debug "[getGroups]", "Сортировка групп по курсам и номерам"
@@ -201,7 +246,7 @@ proc getGroups*(site: Site,
       return simGroups[^1] == x
   return site.groups
 
-proc loadGroups*(site: Site): Future[Site] {.async.} =
+proc loadGroups*(site: ScheduleSite): Future[ScheduleSite] {.async.} =
   ## Хелпер, загружающий все данные с нуля
   debug "[loadGroups]", "Загрузка страницы"
   discard await site.loadPage()
@@ -214,11 +259,16 @@ proc loadGroups*(site: Site): Future[Site] {.async.} =
 
 proc getWeeks*(group: Group): Future[seq[SelectOption]] {.async, gcsafe.} =
   ## Получение доступных недель для группы
-  var client = newAsyncHttpClient(sslContext = newContext(
-      verifyMode = CVerifyNone))
-  client.headers = newHttpHeaders({"Content-Type": "application/x-www-form-urlencoded",
+  var
+    ctx = newContext(verifyMode = CVerifyNone)
+    client = newAsyncHttpClient(sslContext = ctx)
+    headers = newHttpHeaders({
+      "Content-Type": "application/x-www-form-urlencoded",
       "X-CSRF-Token": group.site.csrfToken.get,
-      "Cookie": group.site.cookies.toFullString()})
+      "Cookie": group.site.cookies.toFullString()
+    })
+  client.headers = headers
+
   debug "[getWeeks]", "Получение доступных недель для группы", $group
   let
     weeksRawJson = await client.requestWithRetry(parseUri(SCHEDULE_WEEK),
@@ -235,6 +285,9 @@ proc getWeeks*(group: Group): Future[seq[SelectOption]] {.async, gcsafe.} =
     }))
     resp = await weeksRawJson.body()
     weeksJson = parseJson(resp)
+
+  ctx.destroyContext()
+  headers.clear()
 
   group.weeks.setLen(0)
 
@@ -256,13 +309,17 @@ proc getWeeks*(group: Group): Future[seq[SelectOption]] {.async, gcsafe.} =
 proc getSchedule*(group: Group, week: string): Future[seq[
     ScheduleDay]] {.async.} =
   # Получение расписания на неделю
-  var client = newAsyncHttpClient(sslContext = newContext(
-      verifyMode = CVerifyNone))
-  client.headers = newHttpHeaders({"Content-Type": "application/x-www-form-urlencoded",
+  var
+    ctx = newContext(verifyMode = CVerifyNone)
+    client = newAsyncHttpClient(sslContext = ctx)
+    headers = newHttpHeaders({
+      "Content-Type": "application/x-www-form-urlencoded",
       "X-CSRF-Token": group.site.csrfToken.get,
-      "Cookie": group.site.cookies.toFullString()})
+      "Cookie": group.site.cookies.toFullString()
+    })
+  client.headers = headers
   debug "[getSchedule]", fmt"Получение расписания для группы {$group} для {$week}"
-  let
+  var
     sheldueRawHtml = await client.requestWithRetry(SCHEDULE_BASE, HttpPost,
       body = encodeQuery({
         "ScheduleSearch[fak]": %group.faculty,
@@ -273,6 +330,9 @@ proc getSchedule*(group: Group, week: string): Future[seq[
       }))
     resp = await sheldueRawHtml.body()
     scheduleHtml = parseHtml(resp)
+
+  ctx.destroyContext()
+  headers.clear()
 
   for el in scheduleHtml.findAll("div"):
     if el.attr("class") != "container" and el.child("table") != nil: continue
@@ -327,9 +387,9 @@ proc getSchedule*(group: Group, week: string): Future[seq[
               ls.lessonType == day.lessons[^1].lType and time == day.lessons[
                   ^1].lessonTime: # занятие разделено на группы
               for classroom in classrooms:
-                if not day.lessons[^1].classrooms.contains(classroom):
+                if classroom notin day.lessons[^1].classrooms:
                   day.lessons[^1].classrooms.add(classroom)
-              if not day.lessons[^1].teachers.contains(ls.teacher):
+              if ls.teacher notin INVALID_TEACHERS and ls.teacher notin day.lessons[^1].teachers:
                 day.lessons[^1].teachers.add(ls.teacher)
             else:
               lesson.name = ls.lessonName
@@ -347,6 +407,8 @@ proc getSchedule*(group: Group, week: string): Future[seq[
 
               day.lessons.add(lesson)
           if day.lessons.len > 0: result.add(day)
+
+  scheduleHtml.clear()
 
 proc getSchedule*(group: Group, week: SelectOption): Future[seq[
     ScheduleDay]] {.async.} =
