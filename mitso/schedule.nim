@@ -95,13 +95,7 @@ proc threadParseCourse(site: ScheduleSite, facult: string, form: string,
       "depdrop_all_params[form-id]": form,
       "depdrop_all_params[course-id]": course
     }))
-
-  var groupsJson: JsonNode
-  try:
     groupsJson = parseJson(groupsRawJson.body)
-  except CatchableError as e:
-    echo groupsRawJson.headers
-    raise e
 
   ctx.destroyContext()
   headers.clear()
@@ -217,6 +211,7 @@ proc getGroups*(site: ScheduleSite,
   # Проход по факультетам
   for facult in site.faculties:
     facultiesResponses.add(spawn threadParseFaculty(site, facult.id))
+    await sleepAsync(5000)
 
   for groupsChunk in facultiesResponses:
     let res = ^groupsChunk
