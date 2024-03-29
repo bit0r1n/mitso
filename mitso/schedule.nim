@@ -100,7 +100,7 @@ proc threadParseCourse(site: ScheduleSite, facult: string, form: string,
   try:
     groupsJson = parseJson(groupsRawJson.body)
   except CatchableError as e:
-    echo groupsRawJson.body
+    echo groupsRawJson.headers
     raise e
 
   ctx.destroyContext()
