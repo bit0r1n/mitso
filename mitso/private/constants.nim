@@ -17,6 +17,7 @@
 ]#
 
 const SCHEDULE_BASE* = "https://apps.mitso.by/frontend/web/schedule"
+const SCHEDULE_MAIN_PAGE* = SCHEDULE_BASE & "/group-schedule"
 const SCHEDULE_FORMS* = SCHEDULE_BASE & "/education"
 const SCHEDULE_COURSE* = SCHEDULE_BASE & "/course"
 const SCHEDULE_GROUP* = SCHEDULE_BASE & "/group"

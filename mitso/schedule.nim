@@ -32,7 +32,7 @@ proc loadPage*(site: ScheduleSite): Future[string] {.async.} =
     client = newAsyncHttpClient(sslContext = ctx)
 
   debug "[loadPage]", "Получение контента базовой страницы"
-  let response = await client.requestWithRetry(SCHEDULE_BASE)
+  let response = await client.requestWithRetry(SCHEDULE_MAIN_PAGE)
 
   ctx.destroyContext()
 
