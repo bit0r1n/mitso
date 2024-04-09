@@ -335,8 +335,10 @@ proc getSchedule*(group: Group, week: string): Future[seq[
   ctx.destroyContext()
   headers.clear()
 
-  for el in scheduleHtml.findAll("div"):
-    if el.attr("class") != "weekly-schedule" and el.child("table") != nil and el.attr("style") == "display: none;": continue
+  let weeksContainer = scheduleHtml.findAll("div").filterIt(it.attr("id") == "schedule-content")[0]
+
+  for i, el in weeksContainer.findAll("div"):
+    if i != parseInt(week): continue # для обратной совместимости сохраняется логика: один вызов - получение одной недели
 
     var lessons = newSeq[Lesson]()
     var day: ScheduleDay
