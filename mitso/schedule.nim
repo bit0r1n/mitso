@@ -376,7 +376,7 @@ proc getSchedule*(group: Group, week: string): Future[seq[
 
             var
               ls = parseLessonName(tds[1].innerText.replace("\n", " "))
-              classrooms = if tds[2].innerText.len > 0: parseClassrooms(tds[
+              classrooms = if tds[2].innerText.len > 2: parseClassrooms(tds[
                   2].innerText) else: @[]
               time: LessonTime
 
