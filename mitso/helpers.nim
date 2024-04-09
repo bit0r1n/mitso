@@ -178,7 +178,7 @@ proc parseMonth*(month: string): Month =
     return mDec
 
 proc parseLessonName*(name: string): tuple[lessonName: string, lessonType: LessonType, teacher: string] =
-  var r = re"(\d\. )?(.*) \((.*)\) (.*)$"
+  var r = re"(\d\. )?(.*)(?!\S)?\((.*)\) (.*)$"
   var m = name.find(r).get().captures
   result.lessonName = m[1]
   result.lessonType = parseLessonType(m[2])

@@ -321,7 +321,7 @@ proc getSchedule*(group: Group, week: string): Future[seq[
   client.headers = headers
   debug "[getSchedule]", fmt"Получение расписания для группы {$group} для {$week}"
   var
-    sheldueRawHtml = await client.requestWithRetry(SCHEDULE_BASE, HttpPost,
+    sheldueRawHtml = await client.requestWithRetry(SCHEDULE_MAIN_PAGE, HttpPost,
       body = encodeQuery({
         "ScheduleSearch[fak]": %group.faculty,
         "ScheduleSearch[form]": %group.form,
@@ -336,7 +336,7 @@ proc getSchedule*(group: Group, week: string): Future[seq[
   headers.clear()
 
   for el in scheduleHtml.findAll("div"):
-    if el.attr("class") != "container" and el.child("table") != nil: continue
+    if el.attr("class") != "weekly-schedule" and el.child("table") != nil and el.attr("style") == "display: none;": continue
 
     var lessons = newSeq[Lesson]()
     var day: ScheduleDay
@@ -370,7 +370,7 @@ proc getSchedule*(group: Group, week: string): Future[seq[
                 bool: x.kind == xnElement
             if tds[1].innerText.contains("(нет занятий)") or tds[
                 1].innerText.replace("\n", " ").match(
-                re"^\d\. -$").isSome: continue # игнор лаб/прак для одной части
+                re"^\d\. -[ ]?$").isSome: continue # игнор лаб/прак для одной части
 
             var
               ls = parseLessonName(tds[1].innerText.replace("\n", " "))
