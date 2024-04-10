@@ -21,7 +21,8 @@ import std/[
   htmlparser, xmltree, strtabs,
   uri, options, strformat,
   algorithm, sequtils, strutils,
-  times, threadpool, json, nre
+  times, threadpool, json, nre,
+  base64
 ]
 import private/[utils, constants], typedefs, helpers
 
@@ -376,8 +377,8 @@ proc getSchedule*(group: Group, week: string): Future[seq[
 
             var
               ls = parseLessonName(tds[1].innerText.replace("\n", " "))
-              classrooms = if tds[2].innerText.len > 2: parseClassrooms(tds[
-                  2].innerText) else: @[]
+              classrooms = if tds[2].innerText.len > 0 and encode(tds[2].innerText) != "wqA=":
+                parseClassrooms(tds[2].innerText) else: @[]
               time: LessonTime
 
             try:
