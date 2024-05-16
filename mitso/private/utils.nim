@@ -27,6 +27,7 @@ proc requestWithRetry*(client: HttpClient | AsyncHttpClient; url: Uri | string;
              headers: HttpHeaders = nil; multipart: MultipartData = nil): Future[Response | AsyncResponse] {.multisync, gcsafe.} =
   try:
     result = await client.request(url, httpMethod, body, headers, multipart)
+    debug await result.body()
   except:
     result = await client.requestWithRetry(url, httpMethod, body, headers, multipart)
 
