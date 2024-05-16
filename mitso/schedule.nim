@@ -149,7 +149,7 @@ proc threadParseForm(site: ScheduleSite, facult: string, form: string): seq[Grou
   for course in courses.items:
     let groupsCourse = spawn threadParseCourse(site, facult, form, course.id)
     groupsResponses.add(groupsCourse)
-    sleep(3000)
+    sleep(6000)
 
   courses.setLen(0)
 
