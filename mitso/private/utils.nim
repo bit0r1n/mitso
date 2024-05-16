@@ -27,8 +27,7 @@ proc requestWithRetry*(client: HttpClient | AsyncHttpClient; url: Uri | string;
              headers: HttpHeaders = nil; multipart: MultipartData = nil): Future[Response | AsyncResponse] {.multisync, gcsafe.} =
   try:
     result = await client.request(url, httpMethod, body, headers, multipart)
-    debug url, " ", result.status, " ",
-      if "html" notin result.headers["content-type"]: await result.body() else: ""
+    debug url, " ", result.status
   except:
     result = await client.requestWithRetry(url, httpMethod, body, headers, multipart)
 
