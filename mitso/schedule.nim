@@ -149,6 +149,7 @@ proc threadParseForm(site: ScheduleSite, facult: string, form: string): seq[Grou
   for course in courses.items:
     let groupsCourse = spawn threadParseCourse(site, facult, form, course.id)
     groupsResponses.add(groupsCourse)
+    await sleepAsync(3000)
 
   courses.setLen(0)
 
@@ -191,6 +192,7 @@ proc threadParseFaculty(site: ScheduleSite, facult: string): seq[Group] =
   var formsResponses = newSeq[FlowVar[seq[Group]]]()
   for form in forms.items:
     formsResponses.add(spawn threadParseForm(site, facult, form.id))
+    await sleepAsync(3000)
 
   forms.setLen(0)
   
@@ -212,7 +214,7 @@ proc getGroups*(site: ScheduleSite,
   # Проход по факультетам
   for facult in site.faculties:
     facultiesResponses.add(spawn threadParseFaculty(site, facult.id))
-    await sleepAsync(5000)
+    await sleepAsync(3000)
 
   for groupsChunk in facultiesResponses:
     let res = ^groupsChunk
