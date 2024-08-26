@@ -31,8 +31,8 @@ type
     debt*: float
     penalty*: float
   AccountFailedLoginError* = object of CatchableError
+  ScheduleServiceError* = object of CatchableError
   Group* = ref object
-    site*: ScheduleSite
     id*: string
     display*: string
     course*: Course

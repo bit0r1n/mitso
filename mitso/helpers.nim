@@ -340,11 +340,10 @@ proc newScheduleSite*(): ScheduleSite =
   result.faculties = newSeq[SelectOption]()
   result.groups = newSeq[Group]()
 
-proc newGroup*(site: ScheduleSite, id, display: string,
+proc newGroup*(id, display: string,
   course: Course, form: Form, faculty: Faculty,
   weeks: Option[seq[SelectOption]]): Group =
   result = Group(
-    site: site,
     id: id,
     display: display,
     course: course,
