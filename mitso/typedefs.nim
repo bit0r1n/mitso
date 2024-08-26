@@ -23,8 +23,6 @@ type
     csrfToken*: Option[string]
     cookies*: HttpHeaderValues
     content*: Option[string]
-    faculties*: seq[SelectOption]
-    groups*: seq[Group]
   Account* = ref object
     fullName*: string
     balance*: float
@@ -38,7 +36,6 @@ type
     course*: Course
     form*: Form
     faculty*: Faculty
-    weeks*: seq[SelectOption]
   Lesson* = ref object
     date*: DateTime
     name*: string

@@ -4,7 +4,7 @@
 ## Установка
 Установка производится запуском `nimble install https://github.com/bit0r1n/mitso`
 
-Для работы с библиотекой при компиляции необходимо добавить параметр `-d:ssl` для выполнения запросов через HTTPS
+Для работы с библиотекой при компиляции необходимо добавить параметр `-d:ssl` для выполнения HTTPS запросов
 
 ## Пример использования
 
@@ -15,21 +15,28 @@ import asyncdispatch, sequtils, strutils
 import mitso/[schedule, helpers, typedefs]
 
 proc main() {.async.} =
-  let site = newScheduleSite()
-  discard await site.loadGroups() #[ Выполняет инициализацию объекта сайта, т.е.
-  загружает базовый контент страницы с сохранением куки, загружает все факультеты, группы ]#
+  let
+    site = newScheduleSite() # Создание объекта сайта
+    fetchedGroups = await site.loadGroups() # Выполняет инициализацию объекта сайта и загрузку групп
+    # Может вылезти ошибка рейтлимита, так что стоит также отлавливать `ScheduleServiceError`
+    #[
+      Что делает loadGroups(site):
+        
+      await site.loadPage() # обновление базового контента (с него читаются факультеты) и CSRF токена
+      let
+        faculties = site.getFaculties() # Получение факультетов с полученного контента
+      result = site.getGroups(faculties) # Получение групп из указанных факультетов
+    ]#
 
   echo "Введи номер группы"
   let
     input = readLine(stdin)
-    groups = site.groups.filter do (x: Group) -> bool: x.display.contains(input)
+    groups = fetchedGroups.filter do (x: Group) -> bool: x.display.contains(input)
 
   echo if groups.len == 0: "Группы не нашлось =(" else: "Найдены группы: " & $groups
 
 waitFor main()
 ```
-
-Для работы с парсом занятий/групп используется многопоточность, что обязует использовать параметр `--threads:on` при компиляции
 
 ### Получение баланса студента (модуль `account`)
 

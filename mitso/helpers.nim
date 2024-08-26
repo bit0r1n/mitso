@@ -337,21 +337,16 @@ proc `%`*(faculty: Faculty): string =
 
 proc newScheduleSite*(): ScheduleSite =
   new(result)
-  result.faculties = newSeq[SelectOption]()
-  result.groups = newSeq[Group]()
 
 proc newGroup*(id, display: string,
-  course: Course, form: Form, faculty: Faculty,
-  weeks: Option[seq[SelectOption]]): Group =
+  course: Course, form: Form, faculty: Faculty): Group =
   result = Group(
     id: id,
     display: display,
     course: course,
     form: form,
-    faculty: faculty,
-    weeks: newSeq[SelectOption]()
+    faculty: faculty
   )
-  if weeks.isSome: result.weeks = weeks.get
 
 proc newLesson*(name: string,
   teachers = newSeq[string](), classrooms = newSeq[string](),

@@ -27,16 +27,12 @@ import std/[
 import private/[utils, constants], typedefs, helpers
 import malebolgia
 
-proc loadPage*(site: ScheduleSite): Future[string] {.async.} =
-  ## Получение и сохранение контента сайта
-  var
-    ctx = newContext(verifyMode = CVerifyNone)
-    client = newAsyncHttpClient(sslContext = ctx)
+proc loadPage*(site: ScheduleSite) {.async.} =
+  ## Получение и сохранение контента сайта, обновление CSRF токена
+  let client = newAsyncHttpClient()
 
   debug "[loadPage]", "Получение контента базовой страницы"
   let response = await client.requestWithRetry(SCHEDULE_MAIN_PAGE)
-
-  ctx.destroyContext()
 
   debug "[loadPage]", "Контент получен, сохранение"
   site.content = some await response.body
@@ -44,8 +40,7 @@ proc loadPage*(site: ScheduleSite): Future[string] {.async.} =
   debug "[loadPage]", "Получение куков"
   site.cookies = response.headers["Set-Cookie"]
 
-  var
-    doc = parseHtml(site.content.get)
+  var doc = parseHtml(site.content.get)
   for m in doc.findAll("meta"):
     if m.attrs.hasKey("name") and m.attrs["name"] == "csrf-token":
       debug "[loadPage]", "CSRF токен получен"
@@ -57,13 +52,10 @@ proc loadPage*(site: ScheduleSite): Future[string] {.async.} =
   if site.csrfToken.isNone:
     raise newException(ValueError, "CSRF token not found")
 
-  return site.content.get
-
 proc getFaculties*(site: ScheduleSite): seq[SelectOption] =
-  ## Получение и сохранение факультетов
+  ## Получение факультетов
   debug "[getFaculties]", "Парс главной страницы"
-  var html = parseHtml(site.content.get)
-  site.faculties.setLen(0)
+  var  html = parseHtml(site.content.get)
   for select in html.findAll("select"): # проход по пунктам селекта, они доступны при загрузке страницы
     if select.attrs.hasKey("id") and select.attrs["id"] == "faculty-id":
       for x in select.items:
@@ -71,19 +63,15 @@ proc getFaculties*(site: ScheduleSite): seq[SelectOption] =
           let facult = (id: x.attr("value"), display: x.innerText)
           debug "[getFaculties]", "Найден факультет", $facult
           result.add(facult)
-          site.faculties.add(facult)
   html.clear()
 
 proc threadParseCourse(faculty, form, course, csrfToken, cookies: string): seq[Group] =
-  var
-    ctx = newContext(verifyMode = CVerifyNone)
-    client = newHttpClient(sslContext = ctx)
-    headers = newHttpHeaders({
+  let client = newHttpClient(headers = newHttpHeaders({
       "Content-Type": "application/x-www-form-urlencoded",
       "X-CSRF-Token": csrfToken,
       "Cookie": cookies
     })
-  client.headers = headers
+  )
 
   debug "[threadParseCourse]", fmt"Получение групп ({$course}, {faculty}, {$form})"
   let groupsRawJson = client.requestWithRetry(parseUri(SCHEDULE_GROUP), HttpPost,
@@ -96,39 +84,33 @@ proc threadParseCourse(faculty, form, course, csrfToken, cookies: string): seq[G
       "depdrop_all_params[course-id]": course
     }))
 
-  ctx.destroyContext()
-  headers.clear()
-
   if "application/json" notin groupsRawJson.headers["content-type", 0]:
-    raise newException(ScheduleServiceError, "Schedule service responded with wrong Content-Type")
+    debug "[threadParseCourse]", "Сервер отправил контент не с ожидаемым типом контента",
+      " ", groupsRawJson.status, " ", groupsRawJson.body
+    raise newException(ScheduleServiceError, "Schedule service (groups) responded with wrong Content-Type")
 
   let groupsJson = parseJson(groupsRawJson.body)
 
   for groupElem in groupsJson["output"]:
-    let group = Group(
+    result.add(Group(
       id: groupElem["id"].getStr(),
       display: groupElem["name"].getStr(),
       course: parseCourse(course),
       form: parseForm(form),
       faculty: parseFaculty(faculty)
-    )
-    debug "[threadParseCourse]", "Найдена группа", $group
-    result.add(group)
+    ))
+    debug "[threadParseCourse]", "Найдена группа", $result[^1]
 
-proc threadParseForm(faculty, form, csrfToken, cookies: string): seq[Group] =
-  var
-    ctx = newContext(verifyMode = CVerifyNone)
-    client = newHttpClient(sslContext = ctx)
-    headers = newHttpHeaders({
-      "Content-Type": "application/x-www-form-urlencoded",
-      "X-CSRF-Token": csrfToken,
-      "Cookie": cookies
-    })
-  client.headers = headers
+proc threadParseForm(faculty, form, csrfToken, cookies: string, sleepTime: int): seq[Group] =
+  let client = newHttpClient(headers = newHttpHeaders({
+        "Content-Type": "application/x-www-form-urlencoded",
+        "X-CSRF-Token": csrfToken,
+        "Cookie": cookies
+      })
+    )
 
   debug "[threadParseForm]", fmt"Получение курсов для факультета {faculty} ({$form})"
-  let
-    coursesRawJson = client.requestWithRetry(parseUri(SCHEDULE_COURSE),
+  let coursesRawJson = client.requestWithRetry(parseUri(SCHEDULE_COURSE),
         HttpPost,
       body = encodeQuery({
       "depdrop_parents[0]": faculty,
@@ -137,11 +119,10 @@ proc threadParseForm(faculty, form, csrfToken, cookies: string): seq[Group] =
       "depdrop_all_params[form-id]": form,
     }))
 
-  ctx.destroyContext()
-  headers.clear()
-
   if "application/json" notin coursesRawJson.headers["content-type", 0]:
-    raise newException(ScheduleServiceError, "Schedule service responded with wrong Content-Type")
+    debug "[threadParseForm]", "Сервер отправил контент не с ожидаемым типом контента",
+      " ", coursesRawJson.status, " ", coursesRawJson.body
+    raise newException(ScheduleServiceError, "Schedule service (courses) responded with wrong Content-Type")
 
   let coursesJson = parseJson(coursesRawJson.body)
   var courses = newSeq[SelectOption]()
@@ -159,58 +140,39 @@ proc threadParseForm(faculty, form, csrfToken, cookies: string): seq[Group] =
     for i, course in courses:
       m.spawn threadParseCourse(faculty = faculty, form = form, course = course.id,
         csrfToken = csrfToken, cookies = cookies) -> coursesGroups[i]
+      if sleepTime > 0: sleep(sleepTime)
+
+  courses = @[]
 
   for groups in coursesGroups:
     result.add(groups)
-  # var
-  #   tp = Taskpool.new(num_threads = countProcessors())
-  #   groupsResponses = newSeq[FlowVar[seq[Group]]]()
-  #
-  # for course in courses:
-  #   groupsResponses.add(tp.spawn threadParseCourse(site, facult, form, course.id))
-  #   sleep(6000)
-  #
-  # courses.setLen(0)
-  #
-  # for response in groupsResponses:
-  #   let groups = sync response
-  #   for group in groups:
-  #     result.add(group)
-  #
-  # tp.shutdown()
-  #
-  # groupsResponses.setLen(0)
 
-proc threadParseFaculty(faculty, csrfToken, cookies: string): seq[Group] =
-  var
-    ctx = newContext(verifyMode = CVerifyNone)
-    client = newHttpClient(sslContext = ctx)
-    headers = newHttpHeaders({
-      "Content-Type": "application/x-www-form-urlencoded",
-      "X-CSRF-Token": csrfToken,
-      "Cookie": cookies
-    })
-  client.headers = headers
+  coursesGroups = @[]
+
+proc threadParseFaculty(faculty, csrfToken, cookies: string, sleepTime: int): seq[Group] =
+  let client = newHttpClient(headers = newHttpHeaders({
+        "Content-Type": "application/x-www-form-urlencoded",
+        "X-CSRF-Token": csrfToken,
+        "Cookie": cookies
+      })
+    )
 
   debug "[threadParseFaculty]", "Получение форм обучения для факультета", $faculty
   let formsRawJson = client.requestWithRetry(parseUri(SCHEDULE_FORMS), HttpPost,
     body = encodeQuery({ "depdrop_parents[0]": faculty,
       "depdrop_all_params[faculty-id]": faculty }))
 
-  headers.clear()
-  ctx.destroyContext()
-
   if "application/json" notin formsRawJson.headers["content-type", 0]:
-    raise newException(ScheduleServiceError, "Schedule service responded with wrong Content-Type")
+    debug "[threadParseFaculty]", "Сервер отправил контент не с ожидаемым типом контента",
+      " ", formsRawJson.status, " ", formsRawJson.body
+    raise newException(ScheduleServiceError, "Schedule service (forms) responded with wrong Content-Type")
 
   let formsJson = parseJson(formsRawJson.body)
   var forms = newSeq[SelectOption]()
 
   # Парс форм обучения
   for form in formsJson["output"].getElems():
-    let form = (form["id"].getStr(), form["name"].getStr())
-    debug "[threadParseFaculty]", "Найдена форма обучения", $form
-    forms.add(form)
+    forms.add((form["id"].getStr(), form["name"].getStr()))
 
   # Проход по формам обучения
   var
@@ -220,67 +182,38 @@ proc threadParseFaculty(faculty, csrfToken, cookies: string): seq[Group] =
   m.awaitAll:
     for i, form in forms:
       m.spawn threadParseForm(faculty = faculty, form = form.id,
-        csrfToken = csrfToken, cookies = cookies) -> formsGroups[i]
-      sleep(6000)
+        csrfToken = csrfToken, cookies = cookies, sleepTime = sleepTime) -> formsGroups[i]
+      if sleepTime > 0: sleep(sleepTime)
 
+  forms = @[]
 
   for groups in formsGroups:
     result.add(groups)
-  # for form in forms:
-  #   formsResponses.add(tp.spawn threadParseForm(site, facult, form.id))
-  #   sleep(6000)
-  #
-  # forms.setLen(0)
-  #
-  # for response in formsResponses:
-  #   let groups = sync response
-  #   for group in groups:
-  #     result.add(group)
-  #
-  # tp.shutdown()
-  # formsResponses.setLen(0)
 
-proc getGroups*(site: ScheduleSite,
-  form: seq[Form] = @[], course: seq[Course] = @[], faculty: seq[Faculty] = @[
-      ]): seq[Group] {.gcsafe.} =
-  ## Получение, фильтрация и сохранение групп (перезаписывает ранее сохраненные группы)
+  formsGroups = @[]
 
-  # Очистка списка групп
-  site.groups.setLen(0)
+proc getGroups*(site: ScheduleSite, faculties: seq[SelectOption], sleepTime = 6000): seq[Group] {.gcsafe.} =
+  ## Получение групп
 
   # Проход по факультетам
   var
-    facultiesGroups = newSeq[seq[Group]](site.faculties.len)
-  var m = createMaster()
+    facultiesGroups = newSeq[seq[Group]](faculties.len)
+    m = createMaster()
 
   m.awaitAll:
-    for i, faculty in site.faculties:
+    for i, faculty in faculties:
       m.spawn threadParseFaculty(faculty = faculty.id,
-        csrfToken = site.csrfToken.get, cookies = site.cookies.toFullString) -> facultiesGroups[i]
-      sleep(6000)
+        csrfToken = site.csrfToken.get, cookies = site.cookies.toFullString, sleepTime = sleepTime) -> facultiesGroups[i]
 
+  var resultGroups = newSeq[Group]()
   for groups in facultiesGroups:
-    site.groups.add(groups)
+    resultGroups.add(groups)
 
-  # var
-  #   tp = Taskpool.new(num_threads = countProcessors())
-  #   facultiesResponses = newSeq[FlowVar[seq[Group]]]()
-  #
-  # for facult in site.faculties:
-  #   facultiesResponses.add(tp.spawn threadParseFaculty(site, facult.id))
-  #   await sleepAsync(6000)
-  #
-  # for groupsChunk in facultiesResponses:
-  #   let res = sync groupsChunk
-  #   for group in res:
-  #     site.groups.add(group)
-  #
-  # tp.shutdown()
-  # facultiesResponses.setLen(0)
+  facultiesGroups = @[]
 
   # Сортировка групп по курсам/номерам
   debug "[getGroups]", "Сортировка групп по курсам и номерам"
-  site.groups.sort do (x, y: Group) -> int:
+  resultGroups.sort do (x, y: Group) -> int:
     result = cmp(x.course, y.course)
     if result == 0:
       result = cmp(x.id, y.id)
@@ -291,42 +224,38 @@ proc getGroups*(site: ScheduleSite,
     Если находятся дублирующие группы - остается только из последнего возможного курса
   ]#
   debug "[getGroups]", "Фильтрация групп"
-  site.groups = site.groups.filter do (x: Group) -> bool:
+  result = resultGroups.filter do (x: Group) -> bool:
     if x.id == INVALID_GROUP_ID: # ???
       debug "[getGroups]", "omgomg😱 its fkin AUDITORIYA group, group of my dreams 😍🤩♥"
       return false # 👎 btw
-    var simGroups = site.groups.filter do (y: Group) -> bool: result = y.id ==
+    var simGroups = resultGroups.filter do (y: Group) -> bool: result = y.id ==
         x.id and y.faculty == x.faculty
     if simGroups.len == 1:
       result = true
     else:
       debug "[getGroups]", "Найдено несколько похожих групп", $simGroups
       simGroups.sort do (y, z: Group) -> int: result = cmp(y.course, z.course)
-      return simGroups[^1] == x
-  return site.groups
+      result = simGroups[^1] == x
 
-proc loadGroups*(site: ScheduleSite): Future[ScheduleSite] {.async.} =
-  ## Хелпер, загружающий все данные с нуля
+  resultGroups = @[]
+
+proc loadGroups*(site: ScheduleSite, sleepTime = 6000): Future[seq[Group]] {.async.} =
+  ## Хелпер, загружающий все группы с нуля
   debug "[loadGroups]", "Загрузка страницы"
-  discard await site.loadPage()
+  await site.loadPage()
   debug "[loadGroups]", "Парс факультетов"
-  discard site.getFaculties()
+  let faculties = site.getFaculties()
   debug "[loadGroups]", "Парс групп"
-  discard site.getGroups()
-
-  result = site
+  result = site.getGroups(faculties, sleepTime)
 
 proc getWeeks*(site: ScheduleSite, group: Group): Future[seq[SelectOption]] {.async, gcsafe.} =
   ## Получение доступных недель для группы
-  var
-    ctx = newContext(verifyMode = CVerifyNone)
-    headers = newHttpHeaders({
-      "Content-Type": "application/x-www-form-urlencoded",
-      "X-CSRF-Token": site.csrfToken.get,
-      "Cookie": site.cookies.toFullString
-    })
-  let client = newAsyncHttpClient(sslContext = ctx)
-  client.headers = headers
+  let client = newAsyncHttpClient(headers = newHttpHeaders({
+        "Content-Type": "application/x-www-form-urlencoded",
+        "X-CSRF-Token": site.csrfToken.get,
+        "Cookie": site.cookies.toFullString
+      })
+    )
 
   debug "[getWeeks]", "Получение доступных недель для группы", $group
   let
@@ -342,45 +271,37 @@ proc getWeeks*(site: ScheduleSite, group: Group): Future[seq[SelectOption]] {.as
       "depdrop_all_params[course-id]": %group.course,
       "depdrop_all_params[group-id]": group.id,
     }))
-    resp = await weeksRawJson.body()
-
-  ctx.destroyContext()
-  headers.clear()
 
   if "application/json" notin weeksRawJson.headers["content-type", 0]:
-    raise newException(ScheduleServiceError, "Schedule service responded with wrong Content-Type")
+    debug "[getWeeks]", "Сервер отправил контент не с ожидаемым типом контента",
+      " ", weeksRawJson.status, " ", await  weeksRawJson.body
+    raise newException(ScheduleServiceError, "Schedule service (weeks) responded with wrong Content-Type")
 
-  let weeksJson = parseJson(resp)
+  let
+    resp = await weeksRawJson.body()
+    weeksJson = parseJson(resp)
 
-  group.weeks.setLen(0)
-
-  if (weeksJson["output"].len == 0):
+  if weeksJson["output"].len == 0:
     debug "[getWeeks]", "Не нашлось доступных недель для", $group
-    group.weeks = @[]
-    return group.weeks
+    return @[]
 
   for week in weeksJson["output"]:
     let weekId = week["id"].getInt()
-    group.weeks.add(($weekId, if weekId > 0: $(weekId + 1) &
+    result.add(($weekId, if weekId > 0: $(weekId + 1) &
         " неделя" else: "Текущая неделя"))
 
   debug "[getWeeks]", "Получены недели для группы",
-      $group, $group.weeks
-
-  return group.weeks
+      $group, $result
 
 proc getSchedule*(site: ScheduleSite, group: Group, week: string): Future[seq[
     ScheduleDay]] {.async.} =
   # Получение расписания на неделю
-  var
-    ctx = newContext(verifyMode = CVerifyNone)
-    client = newAsyncHttpClient(sslContext = ctx)
-    headers = newHttpHeaders({
-      "Content-Type": "application/x-www-form-urlencoded",
-      "X-CSRF-Token": site.csrfToken.get,
-      "Cookie": site.cookies.toFullString()
-    })
-  client.headers = headers
+  let client = newAsyncHttpClient(headers = newHttpHeaders({
+        "Content-Type": "application/x-www-form-urlencoded",
+        "X-CSRF-Token": site.csrfToken.get,
+        "Cookie": site.cookies.toFullString
+      })
+    )
   debug "[getSchedule]", fmt"Получение расписания для группы {$group} для {$week}"
   var
     sheldueRawHtml = await client.requestWithRetry(SCHEDULE_MAIN_PAGE, HttpPost,
@@ -394,10 +315,7 @@ proc getSchedule*(site: ScheduleSite, group: Group, week: string): Future[seq[
     resp = await sheldueRawHtml.body()
     scheduleHtml = parseHtml(resp)
 
-  ctx.destroyContext()
-  headers.clear()
-
-  let weeksContainer = scheduleHtml.findAll("div").filterIt(it.attr("id") == "schedule-content")[0]
+  var weeksContainer = scheduleHtml.findAll("div").filterIt(it.attr("id") == "schedule-content")[0]
 
   for i, el in weeksContainer.findAll("div"):
     if i != parseInt(week): continue # для обратной совместимости сохраняется логика: один вызов - получение одной недели
@@ -423,7 +341,7 @@ proc getSchedule*(site: ScheduleSite, group: Group, week: string): Future[seq[
               zone = utc()
             )
           day.date = dayTime
-          lessons.setLen(0)
+          lessons = @[]
         elif item.tag == "table": # таблица занятий
           let trs = item.findAll("tr").filter do (x: XmlNode) -> bool: x.kind == xnElement
           for i, trDay in trs: # проход по строкам занятий
@@ -474,6 +392,8 @@ proc getSchedule*(site: ScheduleSite, group: Group, week: string): Future[seq[
           if day.lessons.len > 0: result.add(day)
 
   scheduleHtml.clear()
+  resp = ""
+  weeksContainer.clear()
 
 proc getSchedule*(site: ScheduleSite, group: Group, week: SelectOption): Future[seq[
     ScheduleDay]] {.async.} =
