@@ -142,12 +142,12 @@ proc threadParseForm(faculty, form, csrfToken, cookies: string, sleepTime: int):
         csrfToken = csrfToken, cookies = cookies) -> coursesGroups[i]
       if sleepTime > 0: sleep(sleepTime)
 
-  courses = @[]
+  courses.setLen(0)
 
   for groups in coursesGroups:
     result.add(groups)
 
-  coursesGroups = @[]
+  coursesGroups.setLen(0)
 
 proc threadParseFaculty(faculty, csrfToken, cookies: string, sleepTime: int): seq[Group] =
   let client = newHttpClient(headers = newHttpHeaders({
@@ -185,12 +185,12 @@ proc threadParseFaculty(faculty, csrfToken, cookies: string, sleepTime: int): se
         csrfToken = csrfToken, cookies = cookies, sleepTime = sleepTime) -> formsGroups[i]
       if sleepTime > 0: sleep(sleepTime)
 
-  forms = @[]
+  forms.setLen(0)
 
   for groups in formsGroups:
     result.add(groups)
 
-  formsGroups = @[]
+  formsGroups.setLen(0)
 
 proc getGroups*(site: ScheduleSite, faculties: seq[SelectOption], sleepTime = 6000): seq[Group] {.gcsafe.} =
   ## Получение групп
@@ -209,7 +209,7 @@ proc getGroups*(site: ScheduleSite, faculties: seq[SelectOption], sleepTime = 60
   for groups in facultiesGroups:
     resultGroups.add(groups)
 
-  facultiesGroups = @[]
+  facultiesGroups.setLen(0)
 
   # Сортировка групп по курсам/номерам
   debug "[getGroups]", "Сортировка групп по курсам и номерам"
@@ -237,7 +237,7 @@ proc getGroups*(site: ScheduleSite, faculties: seq[SelectOption], sleepTime = 60
       simGroups.sort do (y, z: Group) -> int: result = cmp(y.course, z.course)
       result = simGroups[^1] == x
 
-  resultGroups = @[]
+  resultGroups.setLen(0)
 
 proc loadGroups*(site: ScheduleSite, sleepTime = 6000): Future[seq[Group]] {.async.} =
   ## Хелпер, загружающий все группы с нуля
@@ -341,7 +341,7 @@ proc getSchedule*(site: ScheduleSite, group: Group, week: string): Future[seq[
               zone = utc()
             )
           day.date = dayTime
-          lessons = @[]
+          lessons.setLen(0)
         elif item.tag == "table": # таблица занятий
           let trs = item.findAll("tr").filter do (x: XmlNode) -> bool: x.kind == xnElement
           for i, trDay in trs: # проход по строкам занятий
@@ -390,10 +390,6 @@ proc getSchedule*(site: ScheduleSite, group: Group, week: string): Future[seq[
 
               day.lessons.add(lesson)
           if day.lessons.len > 0: result.add(day)
-
-  scheduleHtml.clear()
-  resp = ""
-  weeksContainer.clear()
 
 proc getSchedule*(site: ScheduleSite, group: Group, week: SelectOption): Future[seq[
     ScheduleDay]] {.async.} =
