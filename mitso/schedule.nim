@@ -318,78 +318,79 @@ proc getSchedule*(site: ScheduleSite, group: Group, week: string): Future[seq[
   var weeksContainer = scheduleHtml.findAll("div").filterIt(it.attr("id") == "schedule-content")[0]
 
   for i, el in weeksContainer.findAll("div"):
-    if i != parseInt(week): continue # для обратной совместимости сохраняется логика: один вызов - получение одной недели
-
-    var lessons = newSeq[Lesson]()
     var day: ScheduleDay
     var eI = -1 # индекс блока дня
     for item in el.items:
-      if item.kind == xnElement:
-        if item.tag == "h2": # блок дня начинается с заголовка - даты
-          eI += 1
+      if item.kind != xnElement: continue
 
-          day = ScheduleDay()
-          day.displayDate = item.innerText
-          day.day = parseDay(eI)
-          let
-            scheduleDayMonth = parseMonth(item.innerText.split(" ")[1])
-            dayTime = dateTime(
-              now().year + (if scheduleDayMonth == mJan and now().month ==
-                  mDec: 1 else: 0),
-              scheduleDayMonth,
-              parseInt(item.innerText.split(" ")[0]),
-              zone = utc()
-            )
-          day.date = dayTime
-          lessons.setLen(0)
-        elif item.tag == "table": # таблица занятий
-          let trs = item.findAll("tr").filter do (x: XmlNode) -> bool: x.kind == xnElement
-          for i, trDay in trs: # проход по строкам занятий
-            if trDay.kind != xnElement: continue
-            if i == 0: continue # игнор из thead
-            var lesson = Lesson()
-            let tds = trDay.findAll("td").filter do (x: XmlNode) ->
-                bool: x.kind == xnElement
-            if tds[1].innerText.contains("(нет занятий)") or tds[
-                1].innerText.replace("\n", " ").match(
-                re"^\d\. -[ ]?$").isSome: continue # игнор лаб/прак для одной части
+      if item.tag == "h2": # блок дня начинается с заголовка - даты
+        eI += 1
 
-            var
-              ls = parseLessonName(tds[1].innerText.replace("\n", " "))
-              classrooms = if tds[2].innerText.len > 0 and encode(tds[2].innerText) != "wqA=":
-                parseClassrooms(tds[2].innerText) else: @[]
-              time: LessonTime
+        day = ScheduleDay(
+          displayDate: item.innerText,
+          day: parseDay(eI),
+          lessons: newSeq[Lesson]()
+        )
 
-            try:
-              time = parseTime(tds[0].innerText) # =))
-            except ValueError:
-              continue
+        let
+          scheduleDayMonth = parseMonth(item.innerText.split(" ")[^1])
+          dayTime = dateTime(
+            year = now().year + (if scheduleDayMonth == mJan and now().month ==
+                mDec: 1 else: 0),
+            month = scheduleDayMonth,
+            monthday = parseInt(item.innerText.split(" ")[1]),
+            zone = utc()
+          )
+        day.date = dayTime
+      elif item.tag == "div" and item.attr("class") == "table-responsive": # таблица занятий
+        let lessonsTable = item.findAll("table")[0]
+        let trs = lessonsTable.findAll("tr").filter do (x: XmlNode) -> bool: x.kind == xnElement
+        for i, trDay in trs: # проход по строкам занятий
+          if trDay.kind != xnElement: continue
+          if i == 0: continue # игнор из thead
+          var lesson = Lesson()
+          let tds = trDay.findAll("td").filter do (x: XmlNode) ->
+              bool: x.kind == xnElement
+          if tds[1].innerText.contains("(нет занятий)") or tds[
+              1].innerText.replace("\n", " ").match(
+              re"^\d\. -[ ]?$").isSome: continue # игнор лаб/прак для одной части
 
-            if day.lessons.len != 0 and ls.lessonName == day.lessons[
-                ^1].name and
-              ls.lessonType == day.lessons[^1].lType and time == day.lessons[
-                  ^1].lessonTime: # занятие разделено на группы
-              for classroom in classrooms:
-                if classroom notin day.lessons[^1].classrooms:
-                  day.lessons[^1].classrooms.add(classroom)
-              if ls.teacher notin INVALID_TEACHERS and ls.teacher notin day.lessons[^1].teachers:
-                day.lessons[^1].teachers.add(ls.teacher)
-            else:
-              lesson.name = ls.lessonName
-              lesson.lType = ls.lessonType
-              if ls.teacher notin INVALID_TEACHERS: lesson.teachers.add(ls.teacher)
-              if classrooms.len > 0: lesson.classrooms.add(
-                  classrooms)
-              lesson.lessonTime = time
+          var
+            ls = parseLessonName(tds[1].innerText.replace("\n", " "))
+            classrooms = if tds[2].innerText.len > 0 and encode(tds[2].innerText) != "wqA=":
+              parseClassrooms(tds[2].innerText) else: @[]
+            time: LessonTime
 
-              var lessonDate = day.date
-              lessonDate += initDuration(hours = ($%lesson.lessonTime).hours -
-                  3, minutes = ($%lesson.lessonTime).minutes)
+          try:
+            time = parseTime(tds[0].innerText) # =))
+          except ValueError:
+            continue
 
-              lesson.date = lessonDate
+          if day.lessons.len != 0 and ls.lessonName == day.lessons[
+              ^1].name and
+            ls.lessonType == day.lessons[^1].lType and time == day.lessons[
+                ^1].lessonTime: # занятие разделено на группы
+            for classroom in classrooms:
+              if classroom notin day.lessons[^1].classrooms:
+                day.lessons[^1].classrooms.add(classroom)
+            if ls.teacher notin INVALID_TEACHERS and ls.teacher notin day.lessons[^1].teachers:
+              day.lessons[^1].teachers.add(ls.teacher)
+          else:
+            lesson.name = ls.lessonName
+            lesson.lType = ls.lessonType
+            if ls.teacher notin INVALID_TEACHERS: lesson.teachers.add(ls.teacher)
+            if classrooms.len > 0: lesson.classrooms.add(
+                classrooms)
+            lesson.lessonTime = time
 
-              day.lessons.add(lesson)
-          if day.lessons.len > 0: result.add(day)
+            var lessonDate = day.date
+            lessonDate += initDuration(hours = ($%lesson.lessonTime).hours -
+                3, minutes = ($%lesson.lessonTime).minutes)
+
+            lesson.date = lessonDate
+
+            day.lessons.add(lesson)
+        if day.lessons.len > 0: result.add(day)
 
 proc getSchedule*(site: ScheduleSite, group: Group, week: SelectOption): Future[seq[
     ScheduleDay]] {.async.} =
