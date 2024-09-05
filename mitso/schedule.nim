@@ -320,6 +320,7 @@ proc getSchedule*(site: ScheduleSite, group: Group, week: string): Future[seq[
   var weekContainerIndex = -1
   for el in weeksContainer.items:
     weekContainerIndex += 1
+
     if weekContainerIndex != parseInt(week): continue # для обратной совместимости сохраняется логика: один вызов - получение одной недели
 
     var day: ScheduleDay
@@ -395,7 +396,6 @@ proc getSchedule*(site: ScheduleSite, group: Group, week: string): Future[seq[
 
             day.lessons.add(lesson)
         if day.lessons.len > 0: result.add(day)
-    weekContainerIndex += 1
 
 proc getSchedule*(site: ScheduleSite, group: Group, week: SelectOption): Future[seq[
     ScheduleDay]] {.async.} =
