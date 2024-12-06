@@ -395,7 +395,9 @@ proc getSchedule*(site: ScheduleSite, group: Group, week: string): Future[seq[
             lesson.date = lessonDate
 
             day.lessons.add(lesson)
-        if day.lessons.len > 0: result.add(day)
+        if day.lessons.len > 0:
+          day.lessons.sort do (x, y: Lesson) -> int: cmp(x.lessonTime, y.lessonTime)
+          result.add(day)
 
 proc getSchedule*(site: ScheduleSite, group: Group, week: SelectOption): Future[seq[
     ScheduleDay]] {.async.} =
