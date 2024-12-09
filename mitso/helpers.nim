@@ -78,11 +78,11 @@ proc parseFaculty*(faculty: string): Faculty =
 
 proc parseTime*(time: string): LessonTime =
   case time:
-  of "8.00-8.40, 8.45-9.25", "8.00-9.25":
+  of "8.00-8.40, 8.45-9.25", "08.00-08.40, 08.45-09.25", "8.00-9.25":
     return ltFirst
   of "09:35-10.15,10.20-11.00", "09.35- 11.00":
     return ltSecond
-  of "11:10-11.15,11.55-12.35", "11.10-12.35":
+  of "11:10-11.15,11.55-12.35", "11:10-11.50,11.55-12.35", "11.10-12.35":
     return ltThird
   of "13:05-13.45,13.50-14.30", "13.05-14.30":
     return ltFourth

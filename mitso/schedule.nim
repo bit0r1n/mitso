@@ -18,14 +18,14 @@
 
 import std/[
   asyncdispatch, httpclient, net,
-  htmlparser, xmltree, strtabs,
+  xmltree, strtabs,
   uri, options, strformat,
   algorithm, sequtils, strutils,
   times, json, nre, base64,
   os
 ]
 import private/[utils, constants], typedefs, helpers
-import malebolgia
+import malebolgia, pkg/htmlparser
 
 proc loadPage*(site: ScheduleSite) {.async.} =
   ## Получение и сохранение контента сайта, обновление CSRF токена

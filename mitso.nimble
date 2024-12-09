@@ -9,4 +9,4 @@ license       = "GPL-3.0-or-later"
 # Dependencies
 
 requires "nim >= 2.0.0"
-requires "malebolgia"
+requires "malebolgia", "htmlparser"
