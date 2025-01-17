@@ -339,9 +339,10 @@ proc getSchedule*(site: ScheduleSite, group: Group, week: string): Future[seq[
 
         let
           scheduleDayMonth = parseMonth(item.innerText.split(" ")[^1])
+          yearOffset = if scheduleDayMonth == mJan and
+            result.filterIt(it.date.month == mDec).len != 0: 1 else: 0
           dayTime = dateTime(
-            year = now().year + (if scheduleDayMonth == mJan and now().month ==
-                mDec: 1 else: 0),
+            year = now().year + yearOffset,
             month = scheduleDayMonth,
             monthday = parseInt(item.innerText.split(" ")[1]),
             zone = utc()
