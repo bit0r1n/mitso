@@ -34,7 +34,7 @@ proc parseTeachers*(rawString: string): seq[string] =
 proc parseClassrooms*(rawString: string): seq[string] =
   if rawString == "Ауд. " or rawString.len == 0: return @[] # актуально для занятий по физкультуре, по другим не видел
   for aud in rawString.split("Ауд. "):
-    if aud.len != 0: result.add(aud)
+    if aud.len != 0: result.add(if aud.contains("БАЗ"): "БАЗ" else: aud)
 
   if result.len == 1 and result[0].contains("-"): # пр. "Ауд 22-23"
     result = result[0].split("-")
