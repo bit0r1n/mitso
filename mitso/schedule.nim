@@ -87,7 +87,7 @@ proc threadParseCourse(faculty, form, course, csrfToken, cookies: string): seq[G
   if "application/json" notin groupsRawJson.headers["content-type", 0]:
     debug "[threadParseCourse]", "Сервер отправил контент не с ожидаемым типом контента",
       " ", groupsRawJson.status, " ", groupsRawJson.body
-    raise newException(ScheduleServiceError, "Schedule service (groups) responded with wrong Content-Type")
+    raise newScheduleServiceError("groups")
 
   let groupsJson = parseJson(groupsRawJson.body)
 
@@ -122,7 +122,7 @@ proc threadParseForm(faculty, form, csrfToken, cookies: string, sleepTime: int):
   if "application/json" notin coursesRawJson.headers["content-type", 0]:
     debug "[threadParseForm]", "Сервер отправил контент не с ожидаемым типом контента",
       " ", coursesRawJson.status, " ", coursesRawJson.body
-    raise newException(ScheduleServiceError, "Schedule service (courses) responded with wrong Content-Type")
+    raise newScheduleServiceError("courses")
 
   let coursesJson = parseJson(coursesRawJson.body)
   var courses = newSeq[SelectOption]()
@@ -165,7 +165,7 @@ proc threadParseFaculty(faculty, csrfToken, cookies: string, sleepTime: int): se
   if "application/json" notin formsRawJson.headers["content-type", 0]:
     debug "[threadParseFaculty]", "Сервер отправил контент не с ожидаемым типом контента",
       " ", formsRawJson.status, " ", formsRawJson.body
-    raise newException(ScheduleServiceError, "Schedule service (forms) responded with wrong Content-Type")
+    raise newScheduleServiceError("forms")
 
   let formsJson = parseJson(formsRawJson.body)
   var forms = newSeq[SelectOption]()
@@ -275,7 +275,7 @@ proc getWeeks*(site: ScheduleSite, group: Group): Future[seq[SelectOption]] {.as
   if "application/json" notin weeksRawJson.headers["content-type", 0]:
     debug "[getWeeks]", "Сервер отправил контент не с ожидаемым типом контента",
       " ", weeksRawJson.status, " ", await  weeksRawJson.body
-    raise newException(ScheduleServiceError, "Schedule service (weeks) responded with wrong Content-Type")
+    raise newScheduleServiceError("weeks")
 
   let
     resp = await weeksRawJson.body()

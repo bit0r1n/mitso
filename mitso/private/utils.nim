@@ -35,7 +35,7 @@ proc requestWithRetry*(client: HttpClient | AsyncHttpClient; url: Uri | string;
 converter toFullString*(values: HttpHeaderValues): string =
   return seq[string](values).join("; ")
 
-proc newScheduleServiceError(endpoint: string): ScheduleServiceError =
+proc newScheduleServiceError*(endpoint: string): ScheduleServiceError =
   new(result)
   result.endpoint = endpoint
   result.msg = &"Schedule service ({endpoint}) response contains invalid Content-Type"

@@ -22,7 +22,7 @@ import asyncdispatch, httpclient, uri, json, times, strutils, algorithm, sequtil
 proc newMitsoWrapper*(): MitsoWrapper =
   new(result)
   result.client = newAsyncHttpClient(userAgent =
-      "MITSO Wrapper (https://github.com/bit0r1n/mitso, 0.3.0)")
+      "MITSO Wrapper (https://github.com/bit0r1n/mitso, 0.3.1)")
 
 proc getApiJsonResponse(wrapper: MitsoWrapper, url, debugEndpoint: string): Future[JsonNode] {.async.} =
   let response = await wrapper.client.requestWithRetry(url)
@@ -116,13 +116,32 @@ proc getGroups*(wrapper: MitsoWrapper, faculty: Faculty, form: Form, course: Cou
     ))
 
 proc getAllGroups*(wrapper: MitsoWrapper): Future[seq[Group]] {.async.} =
+  var resultGroups = newSeq[Group]()
+
   for faculty in Faculty:
     let forms = await wrapper.getFacultyForms(faculty)
     for form in forms:
       let courses = await wrapper.getFormCourses(faculty, form)
       for course in courses:
         let groups = await wrapper.getGroups(faculty, form, course)
-        result.add(groups)
+        resultGroups.add(groups)
+
+  resultGroups.sort do (x, y: Group) -> int:
+    result = cmp(x.course, y.course)
+    if result == 0:
+      result = cmp(x.id, y.id)
+
+  result = resultGroups.filter do (x: Group) -> bool:
+    var simGroups = resultGroups.filter do (y: Group) -> bool: result = y.id ==
+        x.id and y.faculty == x.faculty
+    if simGroups.len == 1:
+      result = true
+    else:
+      debug "[getAllGroups]", "Найдено несколько похожих групп", $simGroups
+      simGroups.sort do (y, z: Group) -> int: result = cmp(y.course, z.course)
+      result = simGroups[^1] == x
+
+  resultGroups.setLen(0)
 
 proc getSchedule*(wrapper: MitsoWrapper, group: Group): Future[seq[ScheduleDay]] {.async.} =
   let scheduleJson = await wrapper.getApiJsonResponse(
