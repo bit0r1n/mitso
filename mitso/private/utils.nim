@@ -16,7 +16,8 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 ]#
 
-import strutils, httpclient, asyncdispatch, uri
+import strutils, httpclient, asyncdispatch, uri, strformat
+from ../typedefs import ScheduleServiceError
 
 proc debug*(args: varargs[string, `$`]): void =
   if defined(debug):
@@ -33,3 +34,15 @@ proc requestWithRetry*(client: HttpClient | AsyncHttpClient; url: Uri | string;
 
 converter toFullString*(values: HttpHeaderValues): string =
   return seq[string](values).join("; ")
+
+proc newScheduleServiceError(endpoint: string): ScheduleServiceError =
+  new(result)
+  result.endpoint = endpoint
+  result.msg = &"Schedule service ({endpoint}) response contains invalid Content-Type"
+
+proc handleNonJsonResponse*(response: AsyncResponse | Response, endpoint: string) {.multisync.} =
+  if "application/json" notin response.headers["content-type", 0]:
+    debug &"[{endpoint}]", "Сервер отправил контент не с ожидаемым типом контента",
+      " ", response.status
+
+    raise newScheduleServiceError(endpoint)

@@ -16,20 +16,23 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 ]#
 
-import options, times, httpcore
+import options, times, httpcore, httpclient
 
 type
   ScheduleSite* = ref object
     csrfToken*: Option[string]
     cookies*: HttpHeaderValues
     content*: Option[string]
+  MitsoWrapper* = ref object
+    client*: AsyncHttpClient
   Account* = ref object
     fullName*: string
     balance*: float
     debt*: float
     penalty*: float
-  AccountFailedLoginError* = object of CatchableError
-  ScheduleServiceError* = object of CatchableError
+  AccountFailedLoginError* = ref object of CatchableError
+  ScheduleServiceError* = ref object of CatchableError
+    endpoint*: string
   Group* = ref object
     id*: string
     display*: string
@@ -46,7 +49,6 @@ type
   ScheduleDay* = ref object
     date*: DateTime
     displayDate*: string
-    day*: WeekDay
     lessons*: seq[Lesson]
   TimeTuple* = tuple
     hours: int
@@ -85,3 +87,4 @@ type
     ltpConsultation
     ltpExam
     ltpCourseProject
+  

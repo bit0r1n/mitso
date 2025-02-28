@@ -55,7 +55,7 @@ proc loadPage*(site: ScheduleSite) {.async.} =
 proc getFaculties*(site: ScheduleSite): seq[SelectOption] =
   ## Получение факультетов
   debug "[getFaculties]", "Парс главной страницы"
-  var  html = parseHtml(site.content.get)
+  var html = parseHtml(site.content.get)
   for select in html.findAll("select"): # проход по пунктам селекта, они доступны при загрузке страницы
     if select.attrs.hasKey("id") and select.attrs["id"] == "faculty-id":
       for x in select.items:
@@ -333,7 +333,6 @@ proc getSchedule*(site: ScheduleSite, group: Group, week: string): Future[seq[
 
         day = ScheduleDay(
           displayDate: item.innerText,
-          day: parseDay(eI),
           lessons: newSeq[Lesson]()
         )
 

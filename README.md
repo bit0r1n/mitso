@@ -8,25 +8,20 @@
 
 ## Пример использования
 
-### Получение расписания группы (модуль `schedule`)
+### Получение расписания группы (модули `schedule` и `wrapper`)
+
+> [!WARNING]
+> Модуль `schedule` содержит реализацию получения данных посредством парсинга пользовательского интерфейса сайта, что на момент написания текста уже не является рекомендуемым инструментом, рекомендуется использовать обертку над API из модуля `wrapper`
 
 ```nim
 import asyncdispatch, sequtils, strutils
-import mitso/[schedule, helpers, typedefs]
+import mitso/[wrapper, helpers, typedefs]
 
 proc main() {.async.} =
   let
-    site = newScheduleSite() # Создание объекта сайта
-    fetchedGroups = await site.loadGroups() # Выполняет инициализацию объекта сайта и загрузку групп
+    wrapper = newMitsoWrapper() # Создание объекта сайта
+    fetchedGroups = await wrapper.getGroups() # Выполняет загрузку групп со всех факультетов -> форм обучения -> курсов
     # Может вылезти ошибка рейтлимита, так что стоит также отлавливать `ScheduleServiceError`
-    #[
-      Что делает loadGroups(site):
-        
-      await site.loadPage() # обновление базового контента (с него читаются факультеты) и CSRF токена
-      let
-        faculties = site.getFaculties() # Получение факультетов с полученного контента
-      result = site.getGroups(faculties) # Получение групп из указанных факультетов
-    ]#
 
   echo "Введи номер группы"
   let

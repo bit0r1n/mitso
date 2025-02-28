@@ -16,14 +16,25 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 ]#
 
-const SCHEDULE_BASE* = "https://apps.mitso.by/frontend/web/schedule"
-const SCHEDULE_MAIN_PAGE* = SCHEDULE_BASE & "/group-schedule"
-const SCHEDULE_FORMS* = SCHEDULE_BASE & "/education"
-const SCHEDULE_COURSE* = SCHEDULE_BASE & "/course"
-const SCHEDULE_GROUP* = SCHEDULE_BASE & "/group"
-const SCHEDULE_WEEK* = SCHEDULE_BASE & "/week"
-const INVALID_GROUP_ID* = "Auditoriya" # ???
-const INVALID_TEACHERS* = @[ "Преподаватель 0. 0.", "Преподаватель к.", "_Вакансия" ] # =((
-const LESSON_DURATION* = (1_000 * 60) * 80
+const
+  SCHEDULE_BASE* = "https://apps.mitso.by/frontend/web/schedule"
+  SCHEDULE_MAIN_PAGE* = SCHEDULE_BASE & "/group-schedule"
+  SCHEDULE_FORMS* = SCHEDULE_BASE & "/education"
+  SCHEDULE_COURSE* = SCHEDULE_BASE & "/course"
+  SCHEDULE_GROUP* = SCHEDULE_BASE & "/group"
+  SCHEDULE_WEEK* = SCHEDULE_BASE & "/week"
 
-const ACCOUNT_LOGIN* = "https://student.mitso.by/login_stud.php"
+  SCHEDULE_API_FORMS* = SCHEDULE_BASE & "/forms"
+  SCHEDULE_API_COURSES* = SCHEDULE_BASE & "/courses"
+  SCHEDULE_API_GROUPS* = SCHEDULE_BASE & "/groups"
+  SCHEDULE_API_LESSONS* = SCHEDULE_BASE & "/group-schedules"
+  SCHEDULE_API_TEACHERS* = SCHEDULE_BASE & "/teachers-list"
+  SCHEDULE_API_TEACHER_SUBJECTS* = SCHEDULE_BASE & "/teacher-subjects"
+  SCHEDULE_API_TEACHER_LESSONS* = SCHEDULE_BASE & "/teacher-schedules"
+  SCHEDULE_API_TEACHER_SUBJECT_LESSONS* = SCHEDULE_BASE & "/teacher-subject-schedules"
+
+  INVALID_GROUP_ID* = "Auditoriya" # ???
+  INVALID_TEACHERS* = @[ "Преподаватель 0. 0.", "Преподаватель к.", "_Вакансия" ] # =((
+  LESSON_DURATION* = (1_000 * 60) * 85
+
+  ACCOUNT_LOGIN* = "https://student.mitso.by/login_stud.php"

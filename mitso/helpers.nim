@@ -177,12 +177,13 @@ proc parseMonth*(month: string): Month =
   of "декабря":
     return mDec
 
-proc parseLessonName*(name: string): tuple[lessonName: string, lessonType: LessonType, teacher: string] =
-  var r = re"(\d\. )?(.*)(?!\S)?\((.*)\) (.*)$"
-  var m = name.find(r).get().captures
+proc parseLessonName*(name: string, parseTeacher = true): tuple[lessonName: string, lessonType: LessonType, teacher: string] =
+  var
+    r = re"(\d\. )?(.*)(?!\S)?\((.*)\)(?: (.*))?$"
+    m = name.find(r).get().captures
   result.lessonName = m[1]
   result.lessonType = parseLessonType(m[2])
-  result.teacher = m[3]
+  result.teacher = if parseTeacher: m[3] else: ""
 
 proc `$`*(form: Form): string =
   case form:
@@ -275,8 +276,8 @@ proc `$`*(lesson: LessonType): string =
 proc `$`*(lesson: Lesson): string =
   var items = @[$lesson.lessonTime]
   if lesson.classrooms.len != 0: items.add("Ауд. " & lesson.classrooms.join(", "))
-  items.add(lesson.name)
-  items.add($lesson.lType)
+  items.add(lesson.name & " (" & $lesson.lType & ")")
+  # items.add($lesson.lType)
   if lesson.teachers.len != 0: items.add(lesson.teachers.join(", "))
 
   return items.join(" | ")
