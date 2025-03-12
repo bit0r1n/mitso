@@ -60,7 +60,8 @@ proc parseLessons(rawLessons: JsonNode): seq[ScheduleDay] =
           classroom = rawLesson["auditorium"].getStr().strip()
 
         if teacher.len != 0 and teacher notin INVALID_TEACHERS: lesson.teachers.add(teacher)
-        if classroom.len != 0: lesson.classrooms.add(classroom)
+        if classroom.len != 0 or cast[seq[char]](classroom) != @['\xC2', '\xA0']:
+          lesson.classrooms.add(classroom)
 
         if scheduleDay.lessons.len != 0 and
           lesson.name == scheduleDay.lessons[^1].name and
