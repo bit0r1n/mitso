@@ -31,6 +31,7 @@ proc getApiJsonResponse(wrapper: MitsoWrapper, url, debugEndpoint: string): Futu
   result = parseJson(await response.body)
 
 proc parseLessons(rawLessons: JsonNode): seq[ScheduleDay] =
+  if rawLessons.kind == JArray: return @[]
   for weekSchedule in rawLessons.keys:
     for daySchedule in rawLessons[weekSchedule].keys:
       let
