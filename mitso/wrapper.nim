@@ -17,12 +17,14 @@
 ]#
 
 import typedefs, helpers, private/[ utils, constants ]
-import asyncdispatch, httpclient, uri, json, times, strutils, algorithm, sequtils
+import asyncdispatch, httpclient, uri, json, times, strutils, algorithm, sequtils, net
 
 proc newMitsoWrapper*(): MitsoWrapper =
   new(result)
-  result.client = newAsyncHttpClient(userAgent =
-      "MITSO Wrapper (https://github.com/bit0r1n/mitso, 0.3.1)")
+  result.client = newAsyncHttpClient(
+    userAgent = USER_AGENT,
+    sslContext = newContext(verifyMode=CVerifyNone)
+  )
 
 proc getApiJsonResponse(wrapper: MitsoWrapper, url, debugEndpoint: string): Future[JsonNode] {.async.} =
   let response = await wrapper.client.requestWithRetry(url)

@@ -20,7 +20,7 @@ import mitso/[wrapper, helpers, typedefs]
 proc main() {.async.} =
   let
     wrapper = newMitsoWrapper() # Создание объекта сайта
-    fetchedGroups = await wrapper.getGroups() # Выполняет загрузку групп со всех факультетов -> форм обучения -> курсов
+    fetchedGroups = await wrapper.getAllGroups() # Выполняет загрузку групп со всех факультетов -> форм обучения -> курсов
     # Может вылезти ошибка рейтлимита, так что стоит также отлавливать `ScheduleServiceError`
 
   echo "Введи номер группы"

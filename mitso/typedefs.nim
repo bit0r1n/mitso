@@ -30,8 +30,8 @@ type
     balance*: float
     debt*: float
     penalty*: float
-  AccountFailedLoginError* = ref object of CatchableError
-  ScheduleServiceError* = ref object of CatchableError
+  AccountFailedLoginError* = object of CatchableError
+  ScheduleServiceError* = object of CatchableError
     endpoint*: string
   Group* = ref object
     id*: string

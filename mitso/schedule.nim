@@ -24,15 +24,20 @@ import std/[
   times, json, nre, base64,
   os
 ]
-import private/[utils, constants], typedefs, helpers
+import private/[ utils, constants ], typedefs, helpers
 import malebolgia, pkg/htmlparser
 
 proc loadPage*(site: ScheduleSite) {.async.} =
   ## Получение и сохранение контента сайта, обновление CSRF токена
-  let client = newAsyncHttpClient()
+  var ctx = newContext(verifyMode=CVerifyNone)
+  let client = newAsyncHttpClient(
+    userAgent = USER_AGENT,
+    sslContext = ctx
+  )
 
   debug "[loadPage]", "Получение контента базовой страницы"
   let response = await client.requestWithRetry(SCHEDULE_MAIN_PAGE)
+  ctx.destroyContext()
 
   debug "[loadPage]", "Контент получен, сохранение"
   site.content = some await response.body
@@ -66,11 +71,15 @@ proc getFaculties*(site: ScheduleSite): seq[SelectOption] =
   html.clear()
 
 proc threadParseCourse(faculty, form, course, csrfToken, cookies: string): seq[Group] =
-  let client = newHttpClient(headers = newHttpHeaders({
+  var ctx = newContext(verifyMode=CVerifyNone)
+  let client = newHttpClient(
+    headers = newHttpHeaders({
       "Content-Type": "application/x-www-form-urlencoded",
       "X-CSRF-Token": csrfToken,
       "Cookie": cookies
-    })
+    }),
+    userAgent = USER_AGENT,
+    sslContext = ctx
   )
 
   debug "[threadParseCourse]", fmt"Получение групп ({$course}, {faculty}, {$form})"
@@ -83,6 +92,7 @@ proc threadParseCourse(faculty, form, course, csrfToken, cookies: string): seq[G
       "depdrop_all_params[form-id]": form,
       "depdrop_all_params[course-id]": course
     }))
+  ctx.destroyContext()
 
   if "application/json" notin groupsRawJson.headers["content-type", 0]:
     debug "[threadParseCourse]", "Сервер отправил контент не с ожидаемым типом контента",
@@ -102,12 +112,16 @@ proc threadParseCourse(faculty, form, course, csrfToken, cookies: string): seq[G
     debug "[threadParseCourse]", "Найдена группа", $result[^1]
 
 proc threadParseForm(faculty, form, csrfToken, cookies: string, sleepTime: int): seq[Group] =
-  let client = newHttpClient(headers = newHttpHeaders({
-        "Content-Type": "application/x-www-form-urlencoded",
-        "X-CSRF-Token": csrfToken,
-        "Cookie": cookies
-      })
-    )
+  var ctx = newContext(verifyMode=CVerifyNone)
+  let client = newHttpClient(
+    headers = newHttpHeaders({
+      "Content-Type": "application/x-www-form-urlencoded",
+      "X-CSRF-Token": csrfToken,
+      "Cookie": cookies
+    }),
+    userAgent = USER_AGENT,
+    sslContext = ctx
+  )
 
   debug "[threadParseForm]", fmt"Получение курсов для факультета {faculty} ({$form})"
   let coursesRawJson = client.requestWithRetry(parseUri(SCHEDULE_COURSE),
@@ -118,6 +132,7 @@ proc threadParseForm(faculty, form, csrfToken, cookies: string, sleepTime: int):
       "depdrop_all_params[faculty-id]": faculty,
       "depdrop_all_params[form-id]": form,
     }))
+  ctx.destroyContext()
 
   if "application/json" notin coursesRawJson.headers["content-type", 0]:
     debug "[threadParseForm]", "Сервер отправил контент не с ожидаемым типом контента",
@@ -150,17 +165,22 @@ proc threadParseForm(faculty, form, csrfToken, cookies: string, sleepTime: int):
   coursesGroups.setLen(0)
 
 proc threadParseFaculty(faculty, csrfToken, cookies: string, sleepTime: int): seq[Group] =
-  let client = newHttpClient(headers = newHttpHeaders({
-        "Content-Type": "application/x-www-form-urlencoded",
-        "X-CSRF-Token": csrfToken,
-        "Cookie": cookies
-      })
-    )
+  var ctx = newContext(verifyMode=CVerifyNone)
+  let client = newHttpClient(
+    headers = newHttpHeaders({
+      "Content-Type": "application/x-www-form-urlencoded",
+      "X-CSRF-Token": csrfToken,
+      "Cookie": cookies
+    }),
+    userAgent = USER_AGENT,
+    sslContext = ctx
+  )
 
   debug "[threadParseFaculty]", "Получение форм обучения для факультета", $faculty
   let formsRawJson = client.requestWithRetry(parseUri(SCHEDULE_FORMS), HttpPost,
     body = encodeQuery({ "depdrop_parents[0]": faculty,
       "depdrop_all_params[faculty-id]": faculty }))
+  ctx.destroyContext()
 
   if "application/json" notin formsRawJson.headers["content-type", 0]:
     debug "[threadParseFaculty]", "Сервер отправил контент не с ожидаемым типом контента",
@@ -250,12 +270,16 @@ proc loadGroups*(site: ScheduleSite, sleepTime = 6000): Future[seq[Group]] {.asy
 
 proc getWeeks*(site: ScheduleSite, group: Group): Future[seq[SelectOption]] {.async, gcsafe.} =
   ## Получение доступных недель для группы
-  let client = newAsyncHttpClient(headers = newHttpHeaders({
-        "Content-Type": "application/x-www-form-urlencoded",
-        "X-CSRF-Token": site.csrfToken.get,
-        "Cookie": site.cookies.toFullString
-      })
-    )
+  var ctx = newContext(verifyMode=CVerifyNone)
+  let client = newAsyncHttpClient(
+    headers = newHttpHeaders({
+      "Content-Type": "application/x-www-form-urlencoded",
+      "X-CSRF-Token": site.csrfToken.get,
+      "Cookie": site.cookies.toFullString
+    }),
+    userAgent = USER_AGENT,
+    sslContext = ctx
+  )
 
   debug "[getWeeks]", "Получение доступных недель для группы", $group
   let
@@ -271,6 +295,7 @@ proc getWeeks*(site: ScheduleSite, group: Group): Future[seq[SelectOption]] {.as
       "depdrop_all_params[course-id]": %group.course,
       "depdrop_all_params[group-id]": group.id,
     }))
+  ctx.destroyContext()
 
   if "application/json" notin weeksRawJson.headers["content-type", 0]:
     debug "[getWeeks]", "Сервер отправил контент не с ожидаемым типом контента",
@@ -296,12 +321,16 @@ proc getWeeks*(site: ScheduleSite, group: Group): Future[seq[SelectOption]] {.as
 proc getSchedule*(site: ScheduleSite, group: Group, week: string): Future[seq[
     ScheduleDay]] {.async.} =
   # Получение расписания на неделю
-  let client = newAsyncHttpClient(headers = newHttpHeaders({
-        "Content-Type": "application/x-www-form-urlencoded",
-        "X-CSRF-Token": site.csrfToken.get,
-        "Cookie": site.cookies.toFullString
-      })
-    )
+  var ctx = newContext(verifyMode=CVerifyNone)
+  let client = newAsyncHttpClient(
+  headers = newHttpHeaders({
+      "Content-Type": "application/x-www-form-urlencoded",
+      "X-CSRF-Token": site.csrfToken.get,
+      "Cookie": site.cookies.toFullString
+    }),
+    userAgent = USER_AGENT,
+    sslContext = ctx
+  )
   debug "[getSchedule]", fmt"Получение расписания для группы {$group} для {$week}"
   var
     sheldueRawHtml = await client.requestWithRetry(SCHEDULE_MAIN_PAGE, HttpPost,
@@ -314,6 +343,7 @@ proc getSchedule*(site: ScheduleSite, group: Group, week: string): Future[seq[
       }))
     resp = await sheldueRawHtml.body()
     scheduleHtml = parseHtml(resp)
+  ctx.destroyContext()
 
   var weeksContainer = scheduleHtml.findAll("div").filterIt(it.attr("id") == "schedule-content")[0]
 

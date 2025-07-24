@@ -38,3 +38,6 @@ const
   LESSON_DURATION* = (1_000 * 60) * 85
 
   ACCOUNT_LOGIN* = "https://student.mitso.by/login_stud.php"
+
+  LIBRARY_VERSION* = "0.3.5"
+  USER_AGENT* = "MITSO Wrapper (https://github.com/bit0r1n/mitso, " & LIBRARY_VERSION & ")"

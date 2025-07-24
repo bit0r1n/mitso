@@ -16,11 +16,11 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 ]#
 
-import strutils, httpclient, asyncdispatch, uri, strformat
+import strutils, httpclient, asyncdispatch, uri, strformat, std/envvars
 from ../typedefs import ScheduleServiceError
 
 proc debug*(args: varargs[string, `$`]): void =
-  if defined(debug):
+  if defined(debug) or getEnv("MITSO_DEBUG") == "1":
     echo args.join(" ")
 
 proc requestWithRetry*(client: HttpClient | AsyncHttpClient; url: Uri | string;
@@ -35,7 +35,7 @@ proc requestWithRetry*(client: HttpClient | AsyncHttpClient; url: Uri | string;
 converter toFullString*(values: HttpHeaderValues): string =
   return seq[string](values).join("; ")
 
-proc newScheduleServiceError*(endpoint: string): ScheduleServiceError =
+proc newScheduleServiceError*(endpoint: string): ref ScheduleServiceError =
   new(result)
   result.endpoint = endpoint
   result.msg = &"Schedule service ({endpoint}) response contains invalid Content-Type"

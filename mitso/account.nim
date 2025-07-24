@@ -18,11 +18,11 @@
 
 import std/[
   asyncdispatch, httpclient, net,
-  strformat, htmlparser, xmltree,
+  strformat, xmltree,
   strutils
 ]
-
 import private/constants, typedefs
+import pkg/htmlparser
 
 proc isLoggedIn(content: var XmlNode): bool =
   let inputs = content.findAll("input")
@@ -37,7 +37,10 @@ proc fetchAccount*(login, password: string): Future[Account] {.async.} =
   ## Авторизация в аккаунт, при успешном входе данные будут сохранены в объект
   var
     ctx = newContext(verifyMode = CVerifyNone)
-    client = newAsyncHttpClient(sslContext = ctx)
+    client = newAsyncHttpClient(
+      sslContext = ctx,
+      userAgent = USER_AGENT
+    )
     headers = newHttpHeaders({ "Content-Type": "application/x-www-form-urlencoded" })
     response = await client.request(
       ACCOUNT_LOGIN, HttpPost, &"login={login}&password={password}",
